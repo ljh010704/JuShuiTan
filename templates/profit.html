@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}利润统计 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>利润统计</h1>
+    <div class="header-actions">
+        <input type="date" id="datePicker" value="{{ today }}" class="date-input" onchange="loadData()">
+    </div>
+</div>
+
+<!-- 利润概览 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">总收入</div>
+        <div class="stat-value" id="totalRevenue">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">采购成本</div>
+        <div class="stat-value" id="totalCost">-</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">总利润</div>
+        <div class="stat-value" id="totalProfit">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">利润率</div>
+        <div class="stat-value" id="profitRate">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">运费</div>
+        <div class="stat-value" id="totalFreight">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">订单数</div>
+        <div class="stat-value" id="totalOrders">-</div>
+    </div>
+</div>
+
+<!-- 图表区域 -->
+<div class="charts-row">
+    <div class="chart-box">
+        <h3>利润趋势</h3>
+        <canvas id="profitTrendChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <h3>各店铺利润</h3>
+        <canvas id="shopProfitChart"></canvas>
+    </div>
+</div>
+
+<!-- 店铺利润明细 -->
+<div class="table-box">
+    <h3>店铺利润明细</h3>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>店铺</th>
+                <th>订单数</th>
+                <th>收入</th>
+                <th>成本</th>
+                <th>利润</th>
+                <th>利润率</th>
+            </tr>
+        </thead>
+        <tbody id="shopTableBody">
+            <tr><td colspan="6" class="text-center">加载中...</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let profitTrendChart = null;
+let shopProfitChart = null;
+
+async function loadData() {
+    const date = document.getElementById('datePicker').value;
+    await Promise.all([
+        loadSummary(date),
+        loadTrend(),
+        loadByShop(date)
+    ]);
+}
+
+async function loadSummary(date) {
+    const res = await apiCall(`/api/profit/summary?date=${date}`);
+    document.getElementById('totalRevenue').textContent = `¥${(res.total_revenue || 0).toFixed(2)}`;
+    document.getElementById('totalCost').textContent = `¥${(res.total_cost || 0).toFixed(2)}`;
+    document.getElementById('totalProfit').textContent = `¥${(res.total_profit || 0).toFixed(2)}`;
+    document.getElementById('profitRate').textContent = `${(res.profit_rate || 0).toFixed(1)}%`;
+    document.getElementById('totalFreight').textContent = `¥${(res.total_freight || 0).toFixed(2)}`;
+    document.getElementById('totalOrders').textContent = res.total_orders || 0;
+}
+
+async function loadTrend() {
+    const res = await apiCall('/api/profit/trend?days=30');
+    const data = res.data || [];
+    const labels = data.map(d => d.date ? d.date.substring(5) : '');
+    const profits = data.map(d => d.total_profit || 0);
+    const costs = data.map(d => d.total_cost || 0);
+
+    if (profitTrendChart) profitTrendChart.destroy();
+    profitTrendChart = new Chart(document.getElementById('profitTrendChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: '利润', data: profits, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 },
+                { label: '成本', data: costs, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3 }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'top' } }, scales: { y: { beginAtZero: true } } }
+    });
+}
+
+async function loadByShop(date) {
+    const res = await apiCall(`/api/profit/by_shop?date=${date}`);
+    const data = res.data || [];
+
+    // 更新表格
+    const tbody = document.getElementById('shopTableBody');
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">暂无数据</td></tr>';
+    } else {
+        tbody.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.shop_name || '-'}</td>
+                <td>${r.order_count}</td>
+                <td>¥${(r.revenue || 0).toFixed(2)}</td>
+                <td>¥${(r.cost || 0).toFixed(2)}</td>
+                <td class="${r.profit >= 0 ? 'text-success' : 'text-danger'}">¥${(r.profit || 0).toFixed(2)}</td>
+                <td>${(r.profit_rate || 0).toFixed(1)}%</td>
+            </tr>
+        `).join('');
+    }
+
+    // 更新图表
+    const labels = data.map(r => r.shop_name || '-');
+    const profits = data.map(r => r.profit || 0);
+
+    if (shopProfitChart) shopProfitChart.destroy();
+    shopProfitChart = new Chart(document.getElementById('shopProfitChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{ label: '利润', data: profits, backgroundColor: profits.map(p => p >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)') }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+    });
+}
+
+// 初始化
+loadData();
+</script>
+{% endblock %}

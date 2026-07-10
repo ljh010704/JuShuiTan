@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}售后管理 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>售后管理</h1>
+    <div class="header-actions">
+        <input type="date" id="datePicker" value="{{ current_date }}" class="date-input">
+        <button onclick="syncData('after_sales')" class="btn btn-primary">同步售后</button>
+    </div>
+</div>
+
+<div class="filter-bar">
+    <span>共 {{ total }} 条记录</span>
+    <select id="statusFilter" onchange="filterByStatus(this.value)">
+        <option value="">全部状态</option>
+        <option value="待处理">待处理</option>
+        <option value="已同意">已同意</option>
+        <option value="已拒绝">已拒绝</option>
+        <option value="已完成">已完成</option>
+    </select>
+</div>
+
+<table class="data-table" id="afterSalesTable">
+    <thead>
+        <tr>
+            <th>售后单号</th>
+            <th>店铺</th>
+            <th>关联订单</th>
+            <th>类型</th>
+            <th>退款金额</th>
+            <th>数量</th>
+            <th>原因</th>
+            <th>状态</th>
+            <th>申请时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr data-status="{{ item.status or '' }}">
+            <td>{{ item.after_sale_id }}</td>
+            <td>{{ item.shop_name or '-' }}</td>
+            <td>{{ item.external_id or item.order_id or '-' }}</td>
+            <td>{{ item.type or '-' }}</td>
+            <td>¥{{ "%.2f"|format(item.amount or 0) }}</td>
+            <td>{{ item.quantity or 0 }}</td>
+            <td>{{ item.reason or '-' }}</td>
+            <td><span class="badge badge-warning">{{ item.status or '-' }}</span></td>
+            <td>{{ item.created_at[:16] if item.created_at else '-' }}</td>
+            <td>
+                <button class="btn btn-sm btn-success" onclick="approveAfterSale('{{ item.after_sale_id }}')">同意</button>
+                <button class="btn btn-sm btn-danger" onclick="rejectAfterSale('{{ item.after_sale_id }}')">拒绝</button>
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not items %}
+        <tr><td colspan="10" class="empty">暂无售后数据，请先同步</td></tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<div id="rejectModal" class="modal" style="display:none">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>拒绝售后</h3>
+            <button class="modal-close" onclick="closeModal('rejectModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <textarea id="rejectReason" rows="4" placeholder="请输入拒绝原因" style="width:100%"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal('rejectModal')">取消</button>
+            <button class="btn btn-danger" onclick="confirmReject()">确认拒绝</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentRejectId = '';
+
+function filterByStatus(status) {
+    const rows = document.querySelectorAll('#afterSalesTable tbody tr');
+    rows.forEach(row => {
+        if (!status || row.dataset.status === status) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+async function approveAfterSale(id) {
+    if (!confirm('确认同意该售后申请？')) return;
+    const res = await apiCall('/api/action/approve-after-sale', 'POST', { after_sale_id: id });
+    alert(res.message);
+    if (res.success) location.reload();
+}
+
+function rejectAfterSale(id) {
+    currentRejectId = id;
+    document.getElementById('rejectReason').value = '';
+    document.getElementById('rejectModal').style.display = 'flex';
+}
+
+async function confirmReject() {
+    const reason = document.getElementById('rejectReason').value;
+    const res = await apiCall('/api/action/reject-after-sale', 'POST', { after_sale_id: currentRejectId, reason });
+    alert(res.message);
+    if (res.success) location.reload();
+    closeModal('rejectModal');
+}
+
+function closeModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+
+async function syncData(type) {
+    if (!confirm('???????????????????????????')) return;
+    try {
+        const res = await apiCall('/api/sync', 'POST', { type });
+        if (res.success) {
+            alert('????????');
+            startAfterSalesPoll();
+        } else {
+            alert('??????: ' + (res.message || '????'));
+        }
+    } catch(e) {
+        alert('????: ' + e.message);
+    }
+}
+
+function startAfterSalesPoll() {
+    const poll = setInterval(async () => {
+        try {
+            const res = await fetch('/api/sync/status');
+            const data = await res.json();
+            if (!data.running) {
+                clearInterval(poll);
+                location.reload();
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+
+function startAfterSalesPoll() {
+    const poll = setInterval(async () => {
+        try {
+            const res = await fetch('/api/sync/status');
+            const data = await res.json();
+            if (!data.running) {
+                clearInterval(poll);
+                location.reload();
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+async function exportAfterSales() {
+    const date = document.getElementById('datePicker').value;
+    try {
+        const resp = await fetch('/api/after-sales/export.xlsx?date=' + encodeURIComponent(date));
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (date || 'after_sales') + '.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('????: ' + (e && e.message ? e.message : e));
+    }
+}
+</script>
+{% endblock %}

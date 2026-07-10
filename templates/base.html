@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}聚水潭数据统计中心{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+    if (!window.Chart) {
+        var s = document.createElement('script');
+        s.src = '{{ url_for('static', filename='js/chart.umd.min.js') }}';
+        document.head.appendChild(s);
+    }
+    </script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">⚡ 聚水潭数据统计中心</div>
+        <div class="nav-links">
+            <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">📊 统计看板</a>
+            <a href="/orders" class="nav-link {% if '/orders' in request.path %}active{% endif %}">📋 订单管理</a>
+            <a href="/after-sales" class="nav-link {% if '/after-sales' in request.path %}active{% endif %}">🔄 售后管理</a>
+            <a href="/profit" class="nav-link {% if '/profit' in request.path %}active{% endif %}">💰 利润统计</a>
+            <a href="/suppliers" class="nav-link {% if '/suppliers' in request.path %}active{% endif %}">🏭 供应商分析</a>
+            <a href="/accounts" class="nav-link {% if '/accounts' in request.path %}active{% endif %}">👤 账号管理</a>
+            <a href="/sync" class="nav-link {% if '/sync' in request.path %}active{% endif %}">🔃 数据同步</a>
+            <a href="/dashboard" class="nav-link" target="_blank" style="color:#00ff88;font-weight:600;">🖥️ 数据大屏</a>
+        </div>
+    </nav>
+
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+    async function apiCall(url, method='GET', body=null) {
+        const opts = { method, headers: {'Content-Type': 'application/json'} };
+        if (body) opts.body = JSON.stringify(body);
+        try {
+            const res = await fetch(url, opts);
+            const text = await res.text();
+            try { return JSON.parse(text); } catch (_) { return { success: false, message: '服务器返回非 JSON: ' + text.slice(0,200) }; }
+        } catch (e) {
+            return { success: false, message: '请求失败: ' + (e && e.message ? e.message : e) };
+        }
+    }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

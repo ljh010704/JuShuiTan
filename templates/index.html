@@ -1,0 +1,281 @@
+﻿{% extends "base.html" %}
+{% block title %}统计看板 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 数据统计看板</h1>
+    <div class="header-actions">
+        <input type="date" id="datePicker" value="{{ today }}" class="date-input">
+        <button onclick="syncData('full')" class="btn btn-primary" id="syncBtn">🔃 同步数据</button>
+        <a href="/dashboard" class="btn btn-outline" target="_blank">🖥️ 数据大屏</a>
+    </div>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">今日订单</div>
+        <div class="stat-value">{{ order_stats.total_orders or 0 }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">今日金额</div>
+        <div class="stat-value">¥{{ "%.0f"|format(order_stats.total_amount or 0) }}</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">今日利润</div>
+        <div class="stat-value">¥{{ "%.0f"|format(order_stats.total_profit or 0) }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">采购成本</div>
+        <div class="stat-value">¥{{ "%.0f"|format(order_stats.total_cost or 0) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">已发货</div>
+        <div class="stat-value">{{ order_stats.shipped_orders or 0 }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">已完成</div>
+        <div class="stat-value">{{ order_stats.completed_orders or 0 }}</div>
+    </div>
+</div>
+
+<!-- 图表区域 -->
+<div class="charts-row">
+    <div class="chart-box">
+        <h3>📈 近30天订单趋势</h3>
+        <canvas id="orderTrendChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <h3>💰 近30天利润趋势</h3>
+        <canvas id="profitTrendChart"></canvas>
+    </div>
+    <div class="chart-box">
+        <h3>📊 订单状态分布</h3>
+        <canvas id="orderStatusChart"></canvas>
+    </div>
+</div>
+
+<!-- 最近订单 -->
+<div class="section">
+    <div class="section-header">
+        <h2>📋 最近订单</h2>
+        <a href="/orders" class="btn btn-link">查看全部 →</a>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>订单号</th>
+                <th>店铺</th>
+                <th>金额</th>
+                <th>状态</th>
+                <th>时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in recent_orders %}
+            <tr>
+                <td>{{ order.external_id or order.order_id }}</td>
+                <td>{{ order.shop_name or order.shop_id }}</td>
+                <td>¥{{ "%.2f"|format(order.pay_amount or 0) }}</td>
+                <td><span class="badge badge-{{ 'success' if 'Finished' in (order.status or '') or 'Completed' in (order.status or '') else 'info' if 'Shipped' in (order.status or '') else 'danger' if 'Cancelled' in (order.status or '') else 'warning' }}">{% if 'Cancelled' in (order.status or '') %}已取消{% elif 'Shipped' in (order.status or '') or 'Sent' in (order.status or '') %}已发货{% elif 'Finished' in (order.status or '') or 'Completed' in (order.status or '') %}已完成{% else %}{{ order.status or '-' }}{% endif %}</span></td>
+                <td>{{ order.created_at[:16] if order.created_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not recent_orders %}
+            <tr><td colspan="5" class="empty">暂无数据，请先同步</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 最近售后 -->
+<div class="section">
+    <div class="section-header">
+        <h2>🔄 最近售后</h2>
+        <a href="/after-sales" class="btn btn-link">查看全部 →</a>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>售后单号</th>
+                <th>店铺</th>
+                <th>关联订单</th>
+                <th>类型</th>
+                <th>金额</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in recent_after_sales %}
+            <tr>
+                <td>{{ item.after_sale_id }}</td>
+                <td>{{ item.shop_name or '-' }}</td>
+                <td>{{ item.external_id or item.order_id or '-' }}</td>
+                <td>{{ item.type or '-' }}</td>
+                <td>¥{{ "%.2f"|format(item.amount or 0) }}</td>
+                <td><span class="badge badge-warning">{{ item.status or '-' }}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-success" onclick="approveAfterSale('{{ item.after_sale_id }}')">同意</button>
+                    <button class="btn btn-sm btn-danger" onclick="rejectAfterSale('{{ item.after_sale_id }}')">拒绝</button>
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not recent_after_sales %}
+            <tr><td colspan="7" class="empty">暂无售后数据，请先同步</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- 同步记录 -->
+<div class="section">
+    <div class="section-header">
+        <h2>🔃 同步记录</h2>
+        <a href="/sync" class="btn btn-link">查看详情 →</a>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>类型</th>
+                <th>状态</th>
+                <th>记录数</th>
+                <th>开始时间</th>
+                <th>完成时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in sync_logs %}
+            <tr>
+                <td>{% if log.sync_type == 'full' %}全量同步{% elif log.sync_type == 'orders' %}订单同步{% elif log.sync_type == 'after_sales' %}售后同步{% else %}{{ log.sync_type }}{% endif %}</td>
+                <td><span class="badge badge-{{ 'success' if log.status == 'success' else 'danger' if log.status == 'failed' else 'warning' }}">{% if log.status == 'success' %}成功{% elif log.status == 'failed' %}失败{% else %}{{ log.status }}{% endif %}</span></td>
+                <td>{{ log.records_count }}</td>
+                <td>{{ log.started_at[:19] if log.started_at else '-' }}</td>
+                <td>{{ log.finished_at[:19] if log.finished_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not sync_logs %}
+            <tr><td colspan="5" class="empty">暂无同步记录</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const trendData = {{ recent_stats | tojson }};
+
+if (trendData.length > 0) {
+    // 订单趋势图
+    new Chart(document.getElementById('orderTrendChart'), {
+        type: 'line',
+        data: {
+            labels: trendData.map(d => d.date),
+            datasets: [
+                { label: '订单数', data: trendData.map(d => d.total_orders), borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.1)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#00d4ff' },
+                { label: '金额(百元)', data: trendData.map(d => Math.round(d.total_amount / 100)), borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.1)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#00ff88' }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#7ec8e3' } } }, scales: { x: { ticks: { color: '#4a6a7a' }, grid: { color: 'rgba(0,212,255,0.05)' } }, y: { ticks: { color: '#4a6a7a' }, grid: { color: 'rgba(0,212,255,0.05)' } } } }
+    });
+
+    // 利润趋势图
+    new Chart(document.getElementById('profitTrendChart'), {
+        type: 'line',
+        data: {
+            labels: trendData.map(d => d.date),
+            datasets: [
+                { label: '利润', data: trendData.map(d => d.total_profit || 0), borderColor: '#00ff88', backgroundColor: 'rgba(0,255,136,0.15)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#00ff88' },
+                { label: '成本', data: trendData.map(d => d.total_cost || 0), borderColor: '#ff9f43', backgroundColor: 'rgba(255,159,67,0.1)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#ff9f43' }
+            ]
+        },
+        options: { responsive: true, plugins: { legend: { labels: { color: '#7ec8e3' } } }, scales: { x: { ticks: { color: '#4a6a7a' }, grid: { color: 'rgba(0,212,255,0.05)' } }, y: { ticks: { color: '#4a6a7a' }, grid: { color: 'rgba(0,212,255,0.05)' } } } }
+    });
+}
+
+// 订单状态饼图
+const statusData = [
+    {{ order_stats.shipped_orders or 0 }},
+    {{ order_stats.completed_orders or 0 }},
+    {{ order_stats.cancelled_orders or 0 }},
+    {{ order_stats.pending_orders or 0 }}
+];
+const statusLabels = ['已发货', '已完成', '已取消', '待处理'];
+const statusColors = ['#00d4ff', '#00ff88', '#ff4757', '#ff9f43'];
+const filtered = [];
+for (let i = 0; i < statusData.length; i++) {
+    if (statusData[i] > 0) filtered.push({ label: statusLabels[i], value: statusData[i], color: statusColors[i] });
+}
+new Chart(document.getElementById('orderStatusChart'), {
+    type: 'doughnut',
+    data: {
+        labels: filtered.map(f => f.label),
+        datasets: [{ data: filtered.map(f => f.value), backgroundColor: filtered.map(f => f.color), borderWidth: 0 }]
+    },
+    options: { responsive: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: '#7ec8e3', padding: 12 } } } }
+});
+
+// 同步数据
+async function syncData(type) {
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.textContent = '???...';
+    try {
+        const res = await apiCall('/api/sync', 'POST', { type });
+        if (res.success) {
+            btn.textContent = '?????...';
+            startSyncPolls();
+        } else {
+            alert('??????: ' + (res.message || '????'));
+            btn.disabled = false;
+            btn.textContent = '????';
+        }
+    } catch(e) {
+        alert('????: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '????';
+    }
+}
+
+function startSyncPolls() {
+    if (window._idxSyncPoll) clearInterval(window._idxSyncPoll);
+    const btn = document.getElementById('syncBtn');
+    window._idxSyncPoll = setInterval(async () => {
+        try {
+            const res = await fetch('/api/sync/status');
+            const data = await res.json();
+            if (!data.running) {
+                clearInterval(window._idxSyncPoll);
+                window._idxSyncPoll = null;
+                btn.disabled = false;
+                btn.textContent = '????';
+                location.reload();
+            }
+        } catch(e) {}
+    }, 5000);
+}
+
+
+// 审核售后
+async function approveAfterSale(id) {
+    if (!confirm('确认同意该售后申请？')) return;
+    const res = await apiCall('/api/action/approve-after-sale', 'POST', { after_sale_id: id });
+    alert(res.message);
+    if (res.success) location.reload();
+}
+
+async function rejectAfterSale(id) {
+    const reason = prompt('请输入拒绝原因');
+    if (reason === null) return;
+    const res = await apiCall('/api/action/reject-after-sale', 'POST', { after_sale_id: id, reason });
+    alert(res.message);
+    if (res.success) location.reload();
+}
+
+// 日期切换
+document.getElementById('datePicker').addEventListener('change', function() {
+    window.location.href = '/?date=' + this.value;
+});
+</script>
+{% endblock %}
