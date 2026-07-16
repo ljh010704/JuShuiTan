@@ -147,20 +147,38 @@ async def _sync_account_once(account, sync_type):
         try:
             if login is not None:
                 await login.close()
+                import gc
+                gc.collect()
         except Exception:
             pass
 
 
 async def _run_sync(sync_type, config):
     """???????? - ?????"""
-    from config import ACCOUNTS
+    from config import ACCOUNTS, MEMORY
+
+    # ????
+    if MEMORY.get('low_memory_mode', True):
+        try:
+            import psutil
+            avail_mb = psutil.virtual_memory().available / 1024 / 1024
+            if avail_mb < 300:
+                return {'success': False, 'message': f'???? (?? {int(avail_mb)}MB)??????'}
+        except ImportError:
+            pass
 
     log_id = SyncLogModel.create(sync_type)
     total_count = 0
     errors = []
 
     try:
-        for account in ACCOUNTS:
+        for i, account in enumerate(ACCOUNTS):
+            # ???? 5 ???????????????
+            if i > 0:
+                await asyncio.sleep(5)
+                if MEMORY.get('auto_gc', True):
+                    import gc
+                    gc.collect()
             account_name = account.get('name', account['username'])
             try:
                 count, account_errors = await _sync_account_once(account, sync_type)

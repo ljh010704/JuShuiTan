@@ -1,0 +1,141 @@
+﻿{% extends "base.html" %}
+{% block title %}利润检测 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>利润检测</h1>
+    <div class="header-actions">
+        <button onclick="runProfitCheck()" class="btn btn-primary" id="checkBtn">开始检测</button>
+        <button onclick="loadHistory()" class="btn btn-outline">刷新记录</button>
+    </div>
+</div>
+
+<!-- 状态显示 -->
+<div id="checkStatus" style="display:none; padding: 12px; background: rgba(0,212,255,0.05); border: 1px solid var(--border-primary); border-radius: 8px; margin-bottom: 16px;">
+    <span id="syncStatusText">检测中...</span>
+</div>
+
+<!-- 最新检测结果 -->
+{% if latest %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">供应商已下架</div>
+        <div class="stat-value" id="supplierCount">{{ latest.supplier_removed_count or 0 }}</div>
+        <div class="stat-unit">件商品需处理</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">禁售平台商品</div>
+        <div class="stat-value" id="bannedCount">{{ latest.banned_platform_count or 0 }}</div>
+        <div class="stat-unit">件商品需处理</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">检测时间</div>
+        <div class="stat-value" style="font-size: 16px;" id="checkedAt">{{ latest.checked_at[:16] if latest.checked_at else '-' }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">总计需处理</div>
+        <div class="stat-value" id="totalCount">{{ (latest.supplier_removed_count or 0) + (latest.banned_platform_count or 0) }}</div>
+        <div class="stat-unit">件商品</div>
+    </div>
+</div>
+
+<!-- 详细数据 -->
+{% if latest.supplier_removed or latest.banned_platform %}
+<div class="section">
+    <h2>详细数据</h2>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>类型</th>
+                    <th>商品信息</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in (latest.supplier_removed or []) %}
+                <tr>
+                    <td><span class="badge badge-danger">供应商已下架</span></td>
+                    <td>{{ item.raw if item.raw else item.data|join(' | ') }}</td>
+                </tr>
+                {% endfor %}
+                {% for item in (latest.banned_platform or []) %}
+                <tr>
+                    <td><span class="badge badge-warning">禁售平台</span></td>
+                    <td>{{ item.raw if item.raw else item.data|join(' | ') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+{% else %}
+<div class="section">
+    <p class="empty">暂无检测记录，点击"开始检测"按钮进行首次利润检测。</p>
+</div>
+{% endif %}
+
+<!-- 检测历史 -->
+{% if history %}
+<div class="section">
+    <h2>检测历史</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>供应商已下架</th>
+                <th>禁售平台</th>
+                <th>总计</th>
+                <th>检测时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for h in history %}
+            <tr>
+                <td>{{ h.id }}</td>
+                <td>{{ h.supplier_removed_count }}</td>
+                <td>{{ h.banned_platform_count }}</td>
+                <td>{{ h.supplier_removed_count + h.banned_platform_count }}</td>
+                <td>{{ h.checked_at[:16] if h.checked_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function runProfitCheck() {
+    const statusEl = document.getElementById('checkStatus');
+    const statusText = document.getElementById('syncStatusText');
+    const btn = document.getElementById('checkBtn');
+    
+    statusEl.style.display = 'block';
+    statusText.textContent = '正在检测利润数据，请勿关闭页面...';
+    btn.disabled = true;
+    btn.textContent = '检测中...';
+    
+    try {
+        const res = await apiCall('/api/profit-check/run', 'POST', {});
+        if (res.success) {
+            statusText.textContent = '检测完成！数据已更新。';
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            statusText.textContent = '失败: ' + (res.message || '未知错误');
+        }
+    } catch(e) {
+        statusText.textContent = '请求失败: ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '开始检测';
+    }
+}
+
+async function loadHistory() {
+    location.reload();
+}
+</script>
+{% endblock %}

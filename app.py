@@ -17,6 +17,7 @@ from routes.accounts import accounts_bp
 from routes.profit import profit_bp
 from routes.dashboard import dashboard_bp
 from routes.supplier import supplier_bp
+from routes.profit_check import profit_check_bp
 
 
 # 定时同步相关
@@ -79,6 +80,7 @@ def create_app():
     app.register_blueprint(profit_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(supplier_bp)
+    app.register_blueprint(profit_check_bp)
 
     # 初始化数据库
     init_db()
@@ -97,6 +99,13 @@ def create_app():
 if __name__ == '__main__':
     from config import WEB
     app = create_app()
+    # ????????
+    try:
+        import psutil
+        mem = psutil.virtual_memory()
+        print(f"[??] ???: {mem.total/1024/1024:.0f}MB | ??: {mem.available/1024/1024:.0f}MB | ???: {mem.percent}%")
+    except ImportError:
+        print("[??] ?? psutil ???????: pip install psutil")
     app.run(
         host=WEB.get('host', '0.0.0.0'),
         port=WEB.get('port', 5000),

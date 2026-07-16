@@ -36,6 +36,18 @@ class JushuitanLogin:
                 '--disable-blink-features=AutomationControlled',
                 '--disable-dev-shm-usage',
                 '--no-sandbox',
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-default-apps',
+                '--disable-sync',
+                '--disable-translate',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-setuid-sandbox',
+                '--disable-software-rasterizer',
+                '--disable-dev-profile',
+                '--js-flags=--max-old-space-size=128',
             ]
         )
         return self
@@ -48,7 +60,7 @@ class JushuitanLogin:
             try:
                 self._context = await self._browser.new_context(
                     storage_state=state_file,
-                    viewport={'width': 1920, 'height': 1080},
+                    viewport={'width': 1280, 'height': 720},
                     user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 )
                 # 注入反检测脚本
@@ -62,7 +74,7 @@ class JushuitanLogin:
             except Exception:
                 pass
         self._context = await self._browser.new_context(
-            viewport={'width': 1920, 'height': 1080},
+            viewport={'width': 1280, 'height': 720},
             user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         )
         await self._context.add_init_script("""
@@ -158,11 +170,24 @@ class JushuitanLogin:
         try:
             if self._page and not self._page.is_closed():
                 await self._page.close()
+            self._page = None
+        except Exception:
+            pass
+        try:
             if self._context:
                 await self._context.close()
+            self._context = None
+        except Exception:
+            pass
+        try:
             if self._browser:
                 await self._browser.close()
+            self._browser = None
+        except Exception:
+            pass
+        try:
             if self._playwright:
                 await self._playwright.stop()
+            self._playwright = None
         except Exception:
             pass

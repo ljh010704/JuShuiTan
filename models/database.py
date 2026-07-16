@@ -101,6 +101,9 @@ def init_db():
     conn.commit()
     conn.close()
 
+    # ????????
+    ProfitCheckModel.init_table()
+
 
 class OrderModel:
     @staticmethod
@@ -399,6 +402,81 @@ class DailyStatsModel:
         finally:
             conn.close()
 
+
+
+class ProfitCheckModel:
+    """??????"""
+
+    @staticmethod
+    def init_table():
+        conn = get_connection()
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS profit_checks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                account_name TEXT DEFAULT '',
+                supplier_removed_count INTEGER DEFAULT 0,
+                banned_platform_count INTEGER DEFAULT 0,
+                supplier_removed TEXT DEFAULT '[]',
+                banned_platform TEXT DEFAULT '[]',
+                raw_data TEXT DEFAULT '{}',
+                checked_at TEXT,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def save(result):
+        import json
+        conn = get_connection()
+        conn.execute("""
+            INSERT INTO profit_checks 
+                (account_name, supplier_removed_count, banned_platform_count,
+                 supplier_removed, banned_platform, raw_data, checked_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            result.get('account_name', ''),
+            result.get('supplier_removed_count', 0),
+            result.get('banned_platform_count', 0),
+            json.dumps(result.get('supplier_removed', []), ensure_ascii=False),
+            json.dumps(result.get('banned_platform', []), ensure_ascii=False),
+            json.dumps(result, ensure_ascii=False),
+            result.get('checked_at', '')
+        ))
+        conn.commit()
+        conn.close()
+
+    @staticmethod
+    def get_recent(limit=20):
+        import json
+        conn = get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM profit_checks ORDER BY id DESC LIMIT ?", 
+                (limit,)
+            ).fetchall()
+            results = []
+            for r in rows:
+                d = dict(r)
+                try:
+                    d['supplier_removed'] = json.loads(d.get('supplier_removed', '[]'))
+                except: pass
+                try:
+                    d['banned_platform'] = json.loads(d.get('banned_platform', '[]'))
+                except: pass
+                results.append(d)
+            return results
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_latest():
+        rows = ProfitCheckModel.get_recent(1)
+        return rows[0] if rows else None
+
+# ????????
+ProfitCheckModel.init_table()
 
 class SyncLogModel:
     @staticmethod
