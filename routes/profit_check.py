@@ -66,3 +66,22 @@ def api_check_history():
     limit = int(request.args.get('limit', 20))
     history = ProfitCheckModel.get_recent(limit)
     return jsonify({'success': True, 'data': history})
+
+@profit_check_bp.route('/api/profit-check/batch-remove', methods=['POST'])
+def api_batch_remove():
+    """??????"""
+    session = get_browser_session()
+    if not session:
+        return jsonify({'success': False, 'message': '?????????????????'})
+    
+    data = request.get_json() or {}
+    remove_type = data.get('type', 'all')
+    
+    try:
+        scraper = ProfitCheckScraper(session)
+        result = asyncio.get_event_loop().run_until_complete(
+            scraper.batch_remove_products(remove_type)
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'??????: {str(e)}'})

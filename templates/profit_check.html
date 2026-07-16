@@ -6,6 +6,7 @@
     <h1>利润检测</h1>
     <div class="header-actions">
         <button onclick="runProfitCheck()" class="btn btn-primary" id="checkBtn">开始检测</button>
+        <button onclick="batchRemove('all')" class="btn btn-danger" id="batchRemoveBtn" style="display:none;">\U0001f5c2 \u6279\u91cf\u4e0b\u67b6</button>
         <button onclick="loadHistory()" class="btn btn-outline">刷新记录</button>
     </div>
 </div>
@@ -137,5 +138,50 @@ async function runProfitCheck() {
 async function loadHistory() {
     location.reload();
 }
+
+async function batchRemove(type) {
+    const typeNames = {
+        'all': '全部（供应商已下架 + 禁售平台）',
+        'supplier': '供应商已下架商品',
+        'banned': '禁售平台商品',
+    };
+    
+    if (!confirm('确认要执行【' + typeNames[type] + '】的下架操作吗？\\n\\n此操作不可撤销！')) return;
+    
+    const statusEl = document.getElementById('checkStatus');
+    const statusText = document.getElementById('syncStatusText');
+    const btn = document.getElementById('batchRemoveBtn');
+    
+    statusEl.style.display = 'block';
+    statusText.textContent = '???????????????...';
+    if (btn) btn.disabled = true;
+    
+    try {
+        const res = await apiCall('/api/profit-check/batch-remove', 'POST', {type});
+        if (res.success) {
+            statusText.textContent = '???' + (res.message || '????');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            statusText.textContent = '??: ' + (res.message || '????');
+        }
+    } catch(e) {
+        statusText.textContent = '????: ' + e.message;
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// Show batch-remove button when results exist
+{% if latest %}
+document.addEventListener('DOMContentLoaded', function() {
+    const count = {{ (latest.supplier_removed_count or 0) + (latest.banned_platform_count or 0) }};
+    if (count > 0) {
+        const btn = document.getElementById('batchRemoveBtn');
+        const actions = document.getElementById('removeActions');
+        if (btn) btn.style.display = 'inline-block';
+        if (actions) actions.style.display = 'block';
+    }
+});
+{% endif %}
 </script>
 {% endblock %}
