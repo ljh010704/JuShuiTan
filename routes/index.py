@@ -11,11 +11,22 @@ index_bp = Blueprint('index', __name__)
 @index_bp.route('/')
 def dashboard():
     date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
-    order_stats = OrderModel.get_stats_for_date(date)
-    after_sale_stats = AfterSalesModel.get_stats_for_date(date)
-    recent_stats = DailyStatsModel.get_recent(30)
-    recent_orders = OrderModel.get_all(page=1, per_page=10)
-    recent_after_sales = AfterSalesModel.get_all(page=1, per_page=10)
+    date_range = request.args.get('date_range', '')
+    days = request.args.get('days', '')
+    
+    if date_range:
+        start, end = date_range.split('_')
+        order_stats = OrderModel.get_stats_for_range(start, end)
+        after_sale_stats = AfterSalesModel.get_stats_for_range(start, end)
+        recent_orders = OrderModel.get_by_range(start, end, page=1, per_page=10)
+        recent_after_sales = AfterSalesModel.get_by_range(start, end, page=1, per_page=10)
+    else:
+        order_stats = OrderModel.get_stats_for_date(date)
+        after_sale_stats = AfterSalesModel.get_stats_for_date(date)
+        recent_orders = OrderModel.get_all(page=1, per_page=10)
+        recent_after_sales = AfterSalesModel.get_all(page=1, per_page=10)
+    
+    recent_stats = DailyStatsModel.get_recent(int(days) if days else 30)
     sync_logs = SyncLogModel.get_recent(5)
 
     return render_template('index.html',
@@ -26,6 +37,8 @@ def dashboard():
         recent_orders=recent_orders,
         recent_after_sales=recent_after_sales,
         sync_logs=sync_logs,
+        date_range=date_range,
+        days=days,
     )
 
 

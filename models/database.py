@@ -222,6 +222,56 @@ class OrderModel:
             conn.close()
 
     @staticmethod
+    def get_stats_for_range(start_date, end_date):
+        """获取日期范围内的统计数据"""
+        conn = get_connection()
+        try:
+            row = conn.execute("""
+                SELECT
+                    COUNT(*) as total_orders,
+                    COALESCE(SUM(pay_amount), 0) as total_amount,
+                    COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN pay_amount ELSE 0 END), 0) as dist_amount,
+                    COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END), 0) as total_cost,
+                    COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as total_profit,
+                    COUNT(CASE WHEN status LIKE '%Shipped%' OR status LIKE '%Sent%' THEN 1 END) as shipped_orders,
+                    COUNT(CASE WHEN status LIKE '%Finished%' OR status LIKE '%Completed%' THEN 1 END) as completed_orders,
+                    COUNT(CASE WHEN status LIKE '%Cancel%' THEN 1 END) as cancelled_orders,
+                    COUNT(CASE WHEN status IN ('WaitCheck', 'WaitSend', 'WaitOuterSent') THEN 1 END) as pending_orders
+                FROM orders 
+                WHERE substr(created_at, 1, 10) BETWEEN ? AND ?
+            """, (start_date, end_date)).fetchone()
+            return dict(row) if row else {}
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_by_range(start_date, end_date, page=1, per_page=50):
+        """获取日期范围内的订单"""
+        conn = get_connection()
+        try:
+            offset = (page - 1) * per_page
+            rows = conn.execute(
+                "SELECT * FROM orders WHERE substr(created_at, 1, 10) BETWEEN ? AND ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (start_date, end_date, per_page, offset)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def count_by_range(start_date, end_date):
+        """获取日期范围内的订单总数"""
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM orders WHERE substr(created_at, 1, 10) BETWEEN ? AND ?",
+                (start_date, end_date)
+            ).fetchone()
+            return row[0] if row else 0
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_all(page=1, per_page=50):
         conn = get_connection()
         try:
@@ -321,6 +371,56 @@ class AfterSalesModel:
         try:
             row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
             return dict(row) if row else None
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_stats_for_range(start_date, end_date):
+        """获取日期范围内的统计数据"""
+        conn = get_connection()
+        try:
+            row = conn.execute("""
+                SELECT
+                    COUNT(*) as total_orders,
+                    COALESCE(SUM(pay_amount), 0) as total_amount,
+                    COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN pay_amount ELSE 0 END), 0) as dist_amount,
+                    COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END), 0) as total_cost,
+                    COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as total_profit,
+                    COUNT(CASE WHEN status LIKE '%Shipped%' OR status LIKE '%Sent%' THEN 1 END) as shipped_orders,
+                    COUNT(CASE WHEN status LIKE '%Finished%' OR status LIKE '%Completed%' THEN 1 END) as completed_orders,
+                    COUNT(CASE WHEN status LIKE '%Cancel%' THEN 1 END) as cancelled_orders,
+                    COUNT(CASE WHEN status IN ('WaitCheck', 'WaitSend', 'WaitOuterSent') THEN 1 END) as pending_orders
+                FROM orders 
+                WHERE substr(created_at, 1, 10) BETWEEN ? AND ?
+            """, (start_date, end_date)).fetchone()
+            return dict(row) if row else {}
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_by_range(start_date, end_date, page=1, per_page=50):
+        """获取日期范围内的订单"""
+        conn = get_connection()
+        try:
+            offset = (page - 1) * per_page
+            rows = conn.execute(
+                "SELECT * FROM orders WHERE substr(created_at, 1, 10) BETWEEN ? AND ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (start_date, end_date, per_page, offset)
+            ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    @staticmethod
+    def count_by_range(start_date, end_date):
+        """获取日期范围内的订单总数"""
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM orders WHERE substr(created_at, 1, 10) BETWEEN ? AND ?",
+                (start_date, end_date)
+            ).fetchone()
+            return row[0] if row else 0
         finally:
             conn.close()
 

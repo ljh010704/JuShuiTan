@@ -5,7 +5,14 @@
 <div class="page-header">
     <h1>📊 数据统计看板</h1>
     <div class="header-actions">
-        <input type="date" id="datePicker" value="{{ today }}" class="date-input">
+        <div style="display:flex; gap:8px; align-items:center;">
+            <input type="date" id="datePicker" value="{{ today }}" class="date-input">
+            <div class="date-range-btns">
+                <button onclick="loadDateRange(1)" class="btn btn-sm btn-outline">今日</button>
+                <button onclick="loadDateRange(7)" class="btn btn-sm btn-outline">近7天</button>
+                <button onclick="loadDateRange(30)" class="btn btn-sm btn-outline">近30天</button>
+            </div>
+        </div>
         <button onclick="syncData('full')" class="btn btn-primary" id="syncBtn">🔃 同步数据</button>
         <a href="/dashboard" class="btn btn-outline" target="_blank">🖥️ 数据大屏</a>
     </div>
@@ -277,5 +284,15 @@ async function rejectAfterSale(id) {
 document.getElementById('datePicker').addEventListener('change', function() {
     window.location.href = '/?date=' + this.value;
 });
+
+// 加载指定天数的数据
+function loadDateRange(days) {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(start.getDate() - days + 1);
+    const startStr = start.toISOString().slice(0, 10);
+    const endStr = end.toISOString().slice(0, 10);
+    window.location.href = `/?date_range=${startStr}_${endStr}&days=${days}`;
+}
 </script>
 {% endblock %}

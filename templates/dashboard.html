@@ -497,6 +497,42 @@
 
     loadData();
     setInterval(loadData, 60000);
+    
+    // 日期选择器
+    const dashPicker = document.getElementById('dashDatePicker');
+    dashPicker.addEventListener('change', function() {
+        loadDashData(this.value);
+    });
+    
+    function loadDashRange(days) {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - days + 1);
+        loadDashData(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10));
+        document.getElementById('dashDateLabel').textContent = `近${days}天`;
+    }
+    
+    function loadDashData(startDate, endDate) {
+        if (!endDate) endDate = startDate;
+        const url = `/api/dashboard/data?start=${startDate}&end=${endDate}`;
+        fetch(url).then(r => r.json()).then(data => {
+            if (data) updateDashDisplay(data);
+        });
+    }
+    
+    function updateDashDisplay(data) {
+        // 更新统计卡片
+        if (data.total) {
+            animateNumber('stat-orders', data.total.orders || data.total.total_orders || 0);
+            animateNumber('stat-amount', data.total.amount || data.total.total_amount || 0);
+            animateNumber('stat-profit', data.total.profit || data.total.total_profit || 0);
+            animateNumber('stat-cost', data.total.cost || data.total.total_cost || 0);
+        }
+        if (data.today) {
+            animateNumber('stat-today-orders', data.today.orders || 0);
+            animateNumber('stat-today-amount', data.today.amount || 0);
+        }
+    }
     </script>
 </body>
 </html>
