@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}供应商分析 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>供应商分析</h1>
+    <div class="header-actions">
+        <button onclick="syncSuppliers()" class="btn btn-primary" id="syncBtn">同步供应商</button>
+        <button onclick="refreshData()" class="btn btn-outline">刷新数据</button>
+        <a href="/sync" class="btn btn-outline">前往同步页</a>
+    </div>
+</div>
+
+<!-- 同步状态 -->
+<div id="syncStatus" style="display:none; padding: 12px; background: #e6f7ff; border-radius: 8px; margin-bottom: 16px;">
+    <span id="syncStatusText">同步中...</span>
+</div>
+
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">合作供应商</div>
+        <div class="stat-value" id="totalSuppliers">--</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">有货供应商</div>
+        <div class="stat-value" id="activeSuppliers">--</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">无货供应商</div>
+        <div class="stat-value" id="inactiveSuppliers">--</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">平均利润率</div>
+        <div class="stat-value" id="avgProfitRate">--%</div>
+    </div>
+</div>
+
+<!-- 无货供应商（可解除合作） -->
+<div class="section" id="noGoodsSection" style="display:none;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="color: #faad14; margin: 0;">无货供应商</h2>
+        <button onclick="batchDissolve()" class="btn btn-danger" id="batchBtn">一键解除全部无货供应商</button>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th><input type="checkbox" id="selectAll" onclick="toggleSelectAll()"></th>
+                <th>供应商名称</th>
+                <th>供应商ID</th>
+                <th>状态</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody id="noGoodsTable"></tbody>
+    </table>
+</div>
+
+<!-- 供应商列表 -->
+<div class="section">
+    <h2>全部供应商</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>供应商名称</th>
+                <th>订单数</th>
+                <th>销售额</th>
+                <th>采购成本</th>
+                <th>利润</th>
+                <th>利润率</th>
+                <th>首单时间</th>
+                <th>最近订单</th>
+                <th>状态</th>
+            </tr>
+        </thead>
+        <tbody id="supplierTable"></tbody>
+    </table>
+</div>
+
+<!-- 确认弹窗 -->
+<div id="confirmModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>确认解除合作</h3>
+            <button class="modal-close" onclick="closeModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="confirmText">确定要解除与该供应商的合作关系吗？</p>
+            <p style="color: #ff4d4f; font-size: 13px; margin-top: 8px;">此操作不可逆，请确认供应商确实没有上架商品。</p>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeModal()">取消</button>
+            <button class="btn btn-danger" id="confirmBtn">确认解除</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allSuppliers = [];
+let selectedIds = new Set();
+
+async function loadData() {
+    try {
+        const res = await fetch('/api/suppliers');
+        const data = await res.json();
+        allSuppliers = data.data || [];
+
+        const total = allSuppliers.length;
+        const active = allSuppliers.filter(s => s.has_goods).length;
+        const inactive = total - active;
+        const activeSuppliers = allSuppliers.filter(s => s.profit_rate > 0);
+        const avgRate = activeSuppliers.length > 0
+            ? activeSuppliers.reduce((sum, s) => sum + s.profit_rate, 0) / activeSuppliers.length
+            : 0;
+
+        document.getElementById('totalSuppliers').textContent = total;
+        document.getElementById('activeSuppliers').textContent = active;
+        document.getElementById('inactiveSuppliers').textContent = inactive;
+        document.getElementById('avgProfitRate').textContent = avgRate.toFixed(1) + '%';
+
+        const noGoods = allSuppliers.filter(s => !s.has_goods);
+        if (noGoods.length > 0) {
+            document.getElementById('noGoodsSection').style.display = 'block';
+            document.getElementById('noGoodsTable').innerHTML = noGoods.map(s => `
+                <tr>
+                    <td><input type="checkbox" class="supplier-check" value="${s.co_id}" onchange="updateSelection()"></td>
+                    <td>${s.name}</td>
+                    <td>${s.co_id}</td>
+                    <td><span class="badge badge-danger">无货</span></td>
+                    <td><button class="btn btn-sm btn-danger" onclick="dissolveOne('${s.co_id}', '${s.name}')">解除合作</button></td>
+                </tr>
+            `).join('');
+        } else {
+            document.getElementById('noGoodsSection').style.display = 'none';
+        }
+
+        document.getElementById('supplierTable').innerHTML = allSuppliers.map(s => `
+            <tr>
+                <td>${s.name}</td>
+                <td>${s.order_count}</td>
+                <td>¥${s.total_amount.toLocaleString()}</td>
+                <td>¥${s.total_cost.toLocaleString()}</td>
+                <td>¥${s.total_profit.toLocaleString()}</td>
+                <td>${s.profit_rate}%</td>
+                <td>${s.first_order}</td>
+                <td>${s.last_order}</td>
+                <td><span class="badge badge-${s.has_goods ? 'success' : 'danger'}">${s.has_goods ? '有货' : '无货'}</span></td>
+            </tr>
+        `).join('');
+
+    } catch(e) {
+        console.error('加载失败:', e);
+    }
+}
+
+function toggleSelectAll() {
+    const checked = document.getElementById('selectAll').checked;
+    document.querySelectorAll('.supplier-check').forEach(cb => {
+        cb.checked = checked;
+        if (checked) selectedIds.add(cb.value);
+        else selectedIds.delete(cb.value);
+    });
+    updateSelection();
+}
+
+function updateSelection() {
+    selectedIds.clear();
+    document.querySelectorAll('.supplier-check:checked').forEach(cb => {
+        selectedIds.add(cb.value);
+    });
+}
+
+function dissolveOne(coId, name) {
+    document.getElementById('confirmText').textContent = `确定要解除与《${name}》的合作关系吗？`;
+    document.getElementById('confirmBtn').onclick = () => doDissolve([coId]);
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function batchDissolve() {
+    const noGoods = allSuppliers.filter(s => !s.has_goods);
+    if (noGoods.length === 0) {
+        alert('没有无货供应商');
+        return;
+    }
+    const names = noGoods.map(s => s.name).join('\n');
+    document.getElementById('confirmText').innerHTML = `确定要解除以下 ${noGoods.length} 家供应商的合作关系吗？<br><br><pre style="max-height:200px;overflow:auto;background:#f5f5f5;padding:8px;border-radius:4px;">${names}</pre>`;
+    document.getElementById('confirmBtn').onclick = () => doDissolve(noGoods.map(s => s.co_id));
+    document.getElementById('confirmModal').style.display = 'flex';
+}
+
+function closeModal() {
+    document.getElementById('confirmModal').style.display = 'none';
+}
+
+async function doDissolve(coIds) {
+    closeModal();
+    const statusEl = document.getElementById('syncStatus');
+    const statusText = document.getElementById('syncStatusText');
+    statusEl.style.display = 'block';
+    statusText.textContent = `正在解除 ${coIds.length} 个供应商的合作...`;
+
+    try {
+        const data = await apiCall('/api/suppliers/dissolve', 'POST', {co_ids: coIds});
+        if (data.success) {
+            statusText.textContent = data.message;
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+                loadData();
+            }, 2000);
+        } else {
+            statusText.textContent = '失败: ' + (data.message || '未知错误');
+        }
+    } catch(e) {
+        statusText.textContent = '请求失败: ' + (e && e.message ? e.message : e);
+    }
+}
+
+async function syncSuppliers() {
+    const btn = document.getElementById('syncBtn');
+    const statusEl = document.getElementById('syncStatus');
+    const statusText = document.getElementById('syncStatusText');
+
+    btn.disabled = true;
+    btn.textContent = '???...';
+    statusEl.style.display = 'block';
+    statusText.textContent = '??????...';
+
+    try {
+        const data = await apiCall('/api/sync', 'POST', {type: 'full'});
+        if (data.success) {
+            statusText.textContent = '???????...';
+            startSupplierPoll();
+        } else {
+            statusText.textContent = '????: ' + (data.message || '????');
+            btn.disabled = false;
+            btn.textContent = '?????';
+        }
+    } catch(e) {
+        statusText.textContent = '????: ' + (e && e.message ? e.message : e);
+        btn.disabled = false;
+        btn.textContent = '?????';
+    }
+}
+
+function startSupplierPoll() {
+    const btn = document.getElementById('syncBtn');
+    const statusText = document.getElementById('syncStatusText');
+    const poll = setInterval(async () => {
+        try {
+            const res = await fetch('/api/sync/status');
+            const data = await res.json();
+            if (!data.running) {
+                clearInterval(poll);
+                statusText.textContent = '?????';
+                btn.disabled = false;
+                btn.textContent = '?????';
+                setTimeout(() => {
+                    document.getElementById('syncStatus').style.display = 'none';
+                    loadData();
+                }, 1500);
+            }
+        } catch(e) {}
+    }, 5000);
+}</script>
+{% endblock %}

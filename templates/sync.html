@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}数据同步 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>数据同步</h1>
+</div>
+
+<!-- 定时同步状态 -->
+<div class="section" style="margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; gap: 16px; padding: 12px 16px; background: #e6f7ff; border-radius: 8px;">
+        <span style="font-size: 14px; color: #1890ff;">⏱ 自动同步：每 15 分钟</span>
+        {% if sync_status.running %}
+        <span class="badge badge-warning">同步中...</span>
+        {% else %}
+        <span class="badge badge-success">空闲</span>
+        {% endif %}
+        {% if sync_status.last_sync %}
+        <span style="font-size: 13px; color: #666;">上次同步: {{ sync_status.last_sync }}</span>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 各账号同步状态 -->
+{% if sync_states %}
+<div class="section" style="margin-bottom: 20px;">
+    <h2>各账号同步状态</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>账号</th>
+                <th>上次订单同步</th>
+                <th>上次售后同步</th>
+                <th>已同步订单数</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for state in sync_states %}
+            <tr>
+                <td>{{ state.account_name }}</td>
+                <td>{{ state.last_order_sync[:16] if state.last_order_sync else '未同步' }}</td>
+                <td>{{ state.last_after_sale_sync[:16] if state.last_after_sale_sync else '未同步' }}</td>
+                <td>{{ state.total_orders_synced }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<div class="sync-actions">
+    <div class="sync-card">
+        <h3>订单同步</h3>
+        <p>从聚水潭网站获取最新订单数据</p>
+        <button onclick="syncData('orders')" class="btn btn-primary" id="syncOrdersBtn">同步订单</button>
+    </div>
+    <div class="sync-card">
+        <h3>售后同步</h3>
+        <p>从聚水潭网站获取最新售后数据</p>
+        <button onclick="syncData('after_sales')" class="btn btn-primary" id="syncAfterSalesBtn">同步售后</button>
+    </div>
+    <div class="sync-card">
+        <h3>全量同步</h3>
+        <p>同时同步订单和售后数据</p>
+        <button onclick="syncData('full')" class="btn btn-primary" id="syncFullBtn">全量同步</button>
+    </div>
+</div>
+
+<div class="sync-status" id="syncStatus" style="display:none">
+    <div class="spinner"></div>
+    <div>
+        <div id="syncStatusText">同步中，请勿关闭页面...</div>
+        <div id="syncStatusDetail" style="font-size:12px;color:#555;margin-top:4px;"></div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>同步记录</h2>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>类型</th>
+                <th>状态</th>
+                <th>记录数</th>
+                <th>错误信息</th>
+                <th>开始时间</th>
+                <th>完成时间</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{% if log.sync_type == 'full' %}全量同步{% elif log.sync_type == 'orders' %}订单同步{% elif log.sync_type == 'after_sales' %}售后同步{% else %}{{ log.sync_type }}{% endif %}</td>
+                <td>
+                    <span class="badge badge-{{ 'success' if log.status == 'success' else 'danger' if log.status == 'failed' else 'warning' }}">
+                        {% if log.status == 'success' %}成功{% elif log.status == 'partial' %}部分成功{% elif log.status == 'failed' %}失败{% else %}{{ log.status }}{% endif %}
+                    </span>
+                </td>
+                <td>{{ log.records_count }}</td>
+                <td>{{ log.error_message[:50] if log.error_message else '-' }}</td>
+                <td>{{ log.started_at[:19] if log.started_at else '-' }}</td>
+                <td>{{ log.finished_at[:19] if log.finished_at else '-' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not logs %}
+            <tr><td colspan="6" class="empty">暂无同步记录</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function syncData(type) {
+    const statusEl = document.getElementById('syncStatus');
+    const statusText = document.getElementById('syncStatusText');
+    const statusDetail = document.getElementById('syncStatusDetail');
+    statusEl.style.display = 'flex';
+    statusText.textContent = '??????...';
+    statusDetail.textContent = '';
+
+    document.querySelectorAll('.sync-card .btn').forEach(b => {
+        b.disabled = true;
+        b.dataset.origText = b.textContent;
+        b.textContent = '???...';
+    });
+
+    try {
+        const res = await apiCall('/api/sync', 'POST', { type });
+        if (res.success) {
+            statusText.textContent = res.message || '?????';
+            statusDetail.textContent = '??????????????';
+            startSyncPoll();
+        } else {
+            statusText.textContent = '????: ' + (res.message || '????');
+            statusDetail.textContent = '???????????';
+            document.querySelectorAll('.sync-card .btn').forEach(b => {
+                b.disabled = false;
+                b.textContent = b.dataset.origText || '??';
+            });
+        }
+    } catch(e) {
+        statusText.textContent = '????: ' + e.message;
+        statusDetail.textContent = '??????????';
+        document.querySelectorAll('.sync-card .btn').forEach(b => {
+            b.disabled = false;
+            b.textContent = b.dataset.origText || '??';
+        });
+    }
+}
+
+function startSyncPoll() {
+    if (window._syncPollTimer) clearInterval(window._syncPollTimer);
+    const statusText = document.getElementById('syncStatusText');
+    const statusDetail = document.getElementById('syncStatusDetail');
+
+    window._syncPollTimer = setInterval(async () => {
+        try {
+            const res = await fetch('/api/sync/status');
+            const data = await res.json();
+            if (!data.running) {
+                clearInterval(window._syncPollTimer);
+                window._syncPollTimer = null;
+                statusText.textContent = '?????';
+                statusDetail.textContent = '????????????...';
+                document.querySelectorAll('.sync-card .btn').forEach(b => {
+                    b.disabled = false;
+                    b.textContent = b.dataset.origText || '??';
+                });
+                setTimeout(() => location.reload(), 2000);
+            }
+        } catch(e) {}
+    }, 5000);
+}</script>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}账号管理 - 聚水潭数据统计中心{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>账号管理</h1>
+</div>
+
+<div class="section">
+    <div class="section-header">
+        <h2>已配置的账号</h2>
+        <span class="text-muted">共 {{ accounts|length }} 个账号</span>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>账号名称</th>
+                <th>用户名</th>
+                <th>状态</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for acc in accounts %}
+            <tr>
+                <td>{{ acc.name }}</td>
+                <td>{{ acc.username }}</td>
+                <td><span class="badge badge-success">已配置</span></td>
+            </tr>
+            {% endfor %}
+            {% if not accounts %}
+            <tr><td colspan="3" class="empty">暂无账号</td></tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="section">
+    <h2>如何添加新账号</h2>
+    <div style="padding: 16px; background: #f5f5f5; border-radius: 8px; font-size: 14px; line-height: 1.8;">
+        <p>1. 打开配置文件 <code>config.py</code></p>
+        <p>2. 在 <code>ACCOUNTS</code> 列表中添加新账号：</p>
+        <pre style="background: #fff; padding: 12px; border-radius: 4px; overflow-x: auto;">ACCOUNTS = [
+    {
+        'name': '账号名称',
+        'username': '手机号',
+        'password': '密码',
+    },
+    # 添加更多账号...
+]</pre>
+        <p>3. 保存后重启应用，点击"同步数据"即可</p>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,79 @@
+"""
+首页统计看板路由
+"""
+import logging
+from flask import Blueprint, render_template, jsonify, request
+from datetime import datetime, timedelta
+from models.database import OrderModel, AfterSalesModel, DailyStatsModel, SyncLogModel
+
+index_bp = Blueprint('index', __name__)
+logger = logging.getLogger(__name__)
+
+
+@index_bp.route('/')
+def dashboard():
+    date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    date_range = request.args.get('date_range', '')
+    days = request.args.get('days', '')
+
+    if date_range:
+        parts = date_range.split('_')
+        if len(parts) == 2:
+            start, end = parts
+            order_stats = OrderModel.get_stats_for_range(start, end)
+            after_sale_stats = AfterSalesModel.get_stats_for_range(start, end)
+            recent_orders = OrderModel.get_by_range(start, end, page=1, per_page=10)
+            recent_after_sales = AfterSalesModel.get_by_range(start, end, page=1, per_page=10)
+        else:
+            order_stats = OrderModel.get_stats_for_date(date)
+            after_sale_stats = AfterSalesModel.get_stats_for_date(date)
+            recent_orders = OrderModel.get_all(page=1, per_page=10)
+            recent_after_sales = AfterSalesModel.get_all(page=1, per_page=10)
+    else:
+        order_stats = OrderModel.get_stats_for_date(date)
+        after_sale_stats = AfterSalesModel.get_stats_for_date(date)
+        recent_orders = OrderModel.get_all(page=1, per_page=10)
+        recent_after_sales = AfterSalesModel.get_all(page=1, per_page=10)
+
+    try:
+        recent_stats = DailyStatsModel.get_recent(int(days) if days else 30)
+    except (ValueError, TypeError):
+        recent_stats = DailyStatsModel.get_recent(30)
+
+    sync_logs = SyncLogModel.get_recent(5)
+
+    return render_template('index.html',
+        today=date,
+        order_stats=order_stats,
+        after_sale_stats=after_sale_stats,
+        recent_stats=recent_stats,
+        recent_orders=recent_orders,
+        recent_after_sales=recent_after_sales,
+        sync_logs=sync_logs,
+        date_range=date_range,
+        days=days,
+    )
+
+
+@index_bp.route('/api/dashboard')
+def api_dashboard():
+    date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+    order_stats = OrderModel.get_stats_for_date(date)
+    after_sale_stats = AfterSalesModel.get_stats_for_date(date)
+    recent_stats = DailyStatsModel.get_recent(30)
+    return jsonify({
+        'date': date,
+        'order_stats': order_stats,
+        'after_sale_stats': after_sale_stats,
+        'trend_data': recent_stats,
+    })
+
+
+@index_bp.route('/api/trend')
+def api_trend():
+    try:
+        days = int(request.args.get('days', 30))
+    except (ValueError, TypeError):
+        days = 30
+    stats = DailyStatsModel.get_recent(days)
+    return jsonify({'data': stats})
