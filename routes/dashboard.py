@@ -34,7 +34,7 @@ def api_dashboard_data():
                 COUNT(*) as total_orders,
                 COUNT(CASE WHEN order_type LIKE '%分销Plus%' THEN 1 END) as dist_orders,
                 COALESCE(SUM(pay_amount), 0) as total_amount,
-                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as total_profit,
+                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as total_profit,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END), 0) as total_cost
             FROM orders{date_filter}
         """, date_params).fetchone()
@@ -51,7 +51,7 @@ def api_dashboard_data():
             SELECT
                 COUNT(*) as orders,
                 COALESCE(SUM(pay_amount), 0) as amount,
-                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as profit
+                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
             FROM orders {today_clause}
         """, today_params).fetchone()
 
@@ -61,7 +61,7 @@ def api_dashboard_data():
                 shop_name,
                 COUNT(*) as order_count,
                 COALESCE(SUM(pay_amount), 0) as amount,
-                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as profit
+                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
             FROM orders
             GROUP BY shop_name
             ORDER BY amount DESC
@@ -74,7 +74,7 @@ def api_dashboard_data():
                 substr(created_at, 1, 7) as month,
                 COUNT(*) as orders,
                 COALESCE(SUM(pay_amount), 0) as amount,
-                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as profit
+                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
             FROM orders WHERE created_at != ""
             GROUP BY month
             ORDER BY month

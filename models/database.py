@@ -229,7 +229,7 @@ class OrderModel:
                     COUNT(*) as total_orders,
                     COALESCE(SUM(pay_amount), 0) as total_amount,
                     COALESCE(SUM(purchase_cost), 0) as total_cost,
-                    COALESCE(SUM(profit), 0) as total_profit
+                    COALESCE(SUM(pay_amount - purchase_cost), 0) as total_profit
                 FROM orders WHERE created_at LIKE ?
             """, (f"{date_str}%",)).fetchone()
             return dict(row) if row else {}
@@ -245,7 +245,7 @@ class OrderModel:
                     COUNT(*) as total_orders,
                     COALESCE(SUM(pay_amount), 0) as total_amount,
                     COALESCE(SUM(purchase_cost), 0) as total_cost,
-                    COALESCE(SUM(profit), 0) as total_profit
+                    COALESCE(SUM(pay_amount - purchase_cost), 0) as total_profit
                 FROM orders WHERE substr(created_at,1,10) BETWEEN ? AND ?
             """, (start_date, end_date)).fetchone()
             return dict(row) if row else {}

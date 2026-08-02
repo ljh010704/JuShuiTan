@@ -25,7 +25,7 @@ def api_suppliers():
                 json_extract(raw_data, '$.supplierCoId') as supplier_co_id,
                 COUNT(*) as order_count,
                 SUM(pay_amount) as total_amount,
-                SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END) as total_profit,
+                SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END) as total_profit,
                 SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END) as total_cost,
                 MIN(created_at) as first_order,
                 MAX(created_at) as last_order
