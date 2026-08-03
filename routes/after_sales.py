@@ -6,7 +6,7 @@ from flask import Blueprint, render_template, jsonify, request, send_file
 from datetime import datetime
 from io import BytesIO
 from openpyxl import Workbook
-from models.database import AfterSalesModel
+from models.database import AfterSalesModel, get_connection
 
 after_sales_bp = Blueprint('after_sales', __name__)
 logger = logging.getLogger(__name__)
@@ -67,8 +67,24 @@ def api_after_sales():
 @after_sales_bp.route('/api/after-sales/stats')
 def api_after_sale_stats():
     date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
-    stats = AfterSalesModel.get_stats_for_date(date)
-    return jsonify(stats)
+    conn = get_connection()
+    try:
+        today = conn.execute(
+            "SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as refund FROM after_sales WHERE created_at LIKE ?",
+            (f"{date}%",)
+        ).fetchone()
+        pending = conn.execute(
+            "SELECT COUNT(*) as cnt FROM after_sales WHERE status IN ('WaitCheck', 'WaitOuterSent')"
+        ).fetchone()
+        total = conn.execute("SELECT COUNT(*) as cnt FROM after_sales").fetchone()
+        return jsonify({
+            'today_count': today['cnt'] if today else 0,
+            'today_refund': today['refund'] if today else 0,
+            'pending_count': pending['cnt'] if pending else 0,
+            'total_count': total['cnt'] if total else 0,
+        })
+    finally:
+        conn.close()
 
 
 @after_sales_bp.route('/api/after-sales/export.xlsx')

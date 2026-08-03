@@ -5,20 +5,47 @@
 <div class="page-header">
     <h1>售后管理</h1>
     <div class="header-actions">
-        <input type="date" id="datePicker" value="{{ current_date }}" class="date-input">
+        <input type="date" id="datePicker" value="{{ current_date }}" class="date-input" onchange="loadAfterSales()">
         <button onclick="syncData('after_sales')" class="btn btn-primary">同步售后</button>
     </div>
 </div>
 
+<!-- 每日售后汇总 -->
+<div class="stats-grid" id="afterSalesStats">
+    <div class="stat-card">
+        <div class="stat-label">今日售后数</div>
+        <div class="stat-value" id="todayCount">-</div>
+    </div>
+    <div class="stat-card danger">
+        <div class="stat-label">待处理</div>
+        <div class="stat-value" id="pendingCount">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">今日退款总额</div>
+        <div class="stat-value" id="todayRefund">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">累计售后</div>
+        <div class="stat-value" id="totalCount">-</div>
+    </div>
+</div>
+
+<!-- 快捷筛选 -->
 <div class="filter-bar">
-    <span>共 {{ total }} 条记录</span>
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="pending">待处理</button>
+    <button class="filter-btn" data-filter="processed">已处理</button>
+    <span class="filter-separator">|</span>
     <select id="statusFilter" onchange="filterByStatus(this.value)">
         <option value="">全部状态</option>
-        <option value="待处理">待处理</option>
-        <option value="已同意">已同意</option>
-        <option value="已拒绝">已拒绝</option>
-        <option value="已完成">已完成</option>
+        <option value="WaitCheck">待审核</option>
+        <option value="WaitOuterSent">待退货</option>
+        <option value="Agreed">已同意</option>
+        <option value="Rejected">已拒绝</option>
+        <option value="Finished">已完成</option>
+        <option value="Cancelled">已取消</option>
     </select>
+    <span style="margin-left:auto; color:#999;">共 {{ total }} 条</span>
 </div>
 
 <div class="table-responsive">
@@ -39,7 +66,7 @@
     </thead>
     <tbody>
         {% for item in items %}
-        <tr data-status="{{ item.status or '' }}">
+        <tr data-status="{{ item.status or '' }}" data-processed="{{ 'false' if item.status in ['WaitCheck', 'WaitOuterSent'] else 'true' }}">
             <td>{{ item.after_sale_id }}</td>
             <td>{{ item.shop_name or '-' }}</td>
             <td>{{ item.external_id or item.order_id or '-' }}</td>
@@ -47,11 +74,24 @@
             <td>¥{{ "%.2f"|format(item.amount or 0) }}</td>
             <td>{{ item.quantity or 0 }}</td>
             <td>{{ item.reason or '-' }}</td>
-            <td><span class="badge badge-warning">{{ item.status or '-' }}</span></td>
+            <td>
+                {% if item.status == 'WaitCheck' %}<span class="badge badge-warning">待审核</span>
+                {% elif item.status == 'WaitOuterSent' %}<span class="badge badge-warning">待退货</span>
+                {% elif item.status == 'Agreed' %}<span class="badge badge-success">已同意</span>
+                {% elif item.status == 'Rejected' %}<span class="badge badge-danger">已拒绝</span>
+                {% elif item.status == 'Finished' %}<span class="badge badge-success">已完成</span>
+                {% elif item.status == 'Cancelled' %}<span class="badge badge-secondary">已取消</span>
+                {% else %}<span class="badge">{{ item.status or '-' }}</span>
+                {% endif %}
+            </td>
             <td>{{ item.created_at[:16] if item.created_at else '-' }}</td>
             <td>
+                {% if item.status in ['WaitCheck', 'WaitOuterSent'] %}
                 <button class="btn btn-sm btn-success" onclick="approveAfterSale('{{ item.after_sale_id }}')">同意</button>
                 <button class="btn btn-sm btn-danger" onclick="rejectAfterSale('{{ item.after_sale_id }}')">拒绝</button>
+                {% else %}
+                <span style="color:#999; font-size:12px;">已处理</span>
+                {% endif %}
             </td>
         </tr>
         {% endfor %}
@@ -80,22 +120,37 @@
 
 {% block scripts %}
 <script>
-let currentRejectId = '';
+var currentRejectId = '';
+var currentFilter = 'all';
 
 function filterByStatus(status) {
-    const rows = document.querySelectorAll('#afterSalesTable tbody tr');
-    rows.forEach(row => {
-        if (!status || row.dataset.status === status) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
+    filterRows();
+}
+
+function filterRows() {
+    var statusVal = document.getElementById('statusFilter').value;
+    var rows = document.querySelectorAll('#afterSalesTable tbody tr');
+    rows.forEach(function(row) {
+        var matchStatus = !statusVal || row.dataset.status === statusVal;
+        var matchFilter = true;
+        if (currentFilter === 'pending') matchFilter = row.dataset.processed === 'false';
+        else if (currentFilter === 'processed') matchFilter = row.dataset.processed === 'true';
+        row.style.display = (matchStatus && matchFilter) ? '' : 'none';
     });
 }
 
+document.querySelectorAll('.filter-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        this.classList.add('active');
+        currentFilter = this.getAttribute('data-filter');
+        filterRows();
+    });
+});
+
 async function approveAfterSale(id) {
     if (!confirm('确认同意该售后申请？')) return;
-    const res = await apiCall('/api/action/approve-after-sale', 'POST', { after_sale_id: id });
+    var res = await apiCall('/api/action/approve-after-sale', 'POST', { after_sale_id: id });
     alert(res.message);
     if (res.success) location.reload();
 }
@@ -107,8 +162,8 @@ function rejectAfterSale(id) {
 }
 
 async function confirmReject() {
-    const reason = document.getElementById('rejectReason').value;
-    const res = await apiCall('/api/action/reject-after-sale', 'POST', { after_sale_id: currentRejectId, reason });
+    var reason = document.getElementById('rejectReason').value;
+    var res = await apiCall('/api/action/reject-after-sale', 'POST', { after_sale_id: currentRejectId, reason: reason });
     alert(res.message);
     if (res.success) location.reload();
     closeModal('rejectModal');
@@ -118,65 +173,54 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none';
 }
 
+async function loadAfterSales() {
+    var date = document.getElementById('datePicker').value;
+    var url = '/api/after-sales';
+    if (date) url += '?date=' + date;
+    location.href = '/after-sales?date=' + date;
+}
+
 async function syncData(type) {
-    if (!confirm('???????????????????????????')) return;
+    if (!confirm('确定要同步售后数据吗？')) return;
     try {
-        const res = await apiCall('/api/sync', 'POST', { type });
+        var res = await apiCall('/api/sync', 'POST', { type: type });
         if (res.success) {
-            alert('????????');
+            alert('同步已开始');
             startAfterSalesPoll();
         } else {
-            alert('??????: ' + (res.message || '????'));
+            alert('同步失败: ' + (res.message || '未知错误'));
         }
     } catch(e) {
-        alert('????: ' + e.message);
+        alert('错误: ' + e.message);
     }
 }
 
 function startAfterSalesPoll() {
-    const poll = setInterval(async () => {
+    var poll = setInterval(async function() {
         try {
-            const res = await fetch('/api/sync/status');
-            const data = await res.json();
+            var res = await fetch('/api/sync/status');
+            var data = await res.json();
             if (!data.running) {
                 clearInterval(poll);
+                loadStats();
                 location.reload();
             }
         } catch(e) {}
     }, 5000);
 }
 
-
-function startAfterSalesPoll() {
-    const poll = setInterval(async () => {
-        try {
-            const res = await fetch('/api/sync/status');
-            const data = await res.json();
-            if (!data.running) {
-                clearInterval(poll);
-                location.reload();
-            }
-        } catch(e) {}
-    }, 5000);
-}
-
-async function exportAfterSales() {
-    const date = document.getElementById('datePicker').value;
+async function loadStats() {
     try {
-        const resp = await fetch('/api/after-sales/export.xlsx?date=' + encodeURIComponent(date));
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        const blob = await resp.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = (date || 'after_sales') + '.xlsx';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-    } catch (e) {
-        alert('????: ' + (e && e.message ? e.message : e));
-    }
+        var date = document.getElementById('datePicker').value || new Date().toISOString().split('T')[0];
+        var res = await fetch('/api/after-sales/stats?date=' + date);
+        var data = await res.json();
+        document.getElementById('todayCount').textContent = data.today_count || 0;
+        document.getElementById('pendingCount').textContent = data.pending_count || 0;
+        document.getElementById('todayRefund').textContent = '¥' + (data.today_refund || 0).toFixed(2);
+        document.getElementById('totalCount').textContent = data.total_count || 0;
+    } catch(e) {}
 }
+
+loadStats();
 </script>
 {% endblock %}
