@@ -28,6 +28,10 @@ def api_dashboard_data():
             date_filter = " WHERE substr(created_at, 1, 10) BETWEEN ? AND ?"
             date_params = [start, end]
 
+        status_filter = " WHERE status NOT LIKE '%Cancel%' AND status NOT LIKE '%Returned%'"
+        if date_filter:
+            status_filter = " AND status NOT LIKE '%Cancel%' AND status NOT LIKE '%Returned%'"
+
         # 整体统计
         total = conn.execute(f"""
             SELECT
@@ -36,9 +40,7 @@ def api_dashboard_data():
                 COALESCE(SUM(pay_amount), 0) as total_amount,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as total_profit,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END), 0) as total_cost
-            FROM orders{date_filter}
-              AND status NOT LIKE '%Cancel%'
-              AND status NOT LIKE '%Returned%'
+            FROM orders{date_filter}{status_filter}
         """, date_params).fetchone()
 
         # 统计天数
