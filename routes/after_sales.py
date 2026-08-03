@@ -74,7 +74,7 @@ def api_after_sale_stats():
             (f"{date}%",)
         ).fetchone()
         pending = conn.execute(
-            "SELECT COUNT(*) as cnt FROM after_sales WHERE status IN ('WaitCheck', 'WaitOuterSent')"
+            "SELECT COUNT(*) as cnt FROM after_sales WHERE status IN ('WaitCheck', 'WaitOuterSent') AND type != '未发货退款'"
         ).fetchone()
         total = conn.execute("SELECT COUNT(*) as cnt FROM after_sales").fetchone()
         return jsonify({
