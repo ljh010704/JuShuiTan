@@ -536,20 +536,27 @@
             }
 
             // 状态分布
-            if (data.status.length > 0) {
-                const colorMap = {'Cancelled':'#ff6b6b','Shipped':'#00d4ff','Sent':'#00d4ff','Finished':'#00ff7f','Completed':'#00ff7f','WaitCheck':'#ff9800','WaitOuterSent':'#ff9800','WaitConfirm':'#ff9800','Question':'#ff6b6b','Split':'#9e9e9e','Merged':'#9e9e9e'};
-                const nameMap = {'Cancelled':'已取消','Shipped':'已发货','Sent':'已发货','Finished':'已完成','Completed':'已完成','WaitCheck':'待审核','WaitOuterSent':'待发货','WaitConfirm':'待确认','Question':'异常','Split':'已拆分','Merged':'已合并'};
-                new Chart(document.getElementById('statusChart'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: data.status.map(s => nameMap[s.status] || s.status),
-                        datasets: [{ data: data.status.map(s => s.cnt),
-                            backgroundColor: data.status.map(s => colorMap[s.status] || '#9e9e9e'),
-                            borderWidth: 0 }]
-                    },
-                    options: { responsive: true, cutout: '60%',
-                        plugins: { legend: { position: 'right', labels: { color: '#7ec8e3', padding: 12 } } } }
-                });
+            if (data.status && data.status.length > 0) {
+                try {
+                    var colorMap = {'Cancelled':'#ff6b6b','Shipped':'#00d4ff','Sent':'#00d4ff','Finished':'#00ff7f','Completed':'#00ff7f','WaitCheck':'#ff9800','WaitOuterSent':'#ff9800','WaitConfirm':'#ff9800','Question':'#ff6b6b','Split':'#9e9e9e','Merged':'#9e9e9e'};
+                    var nameMap = {'Cancelled':'已取消','Shipped':'已发货','Sent':'已发货','Finished':'已完成','Completed':'已完成','WaitCheck':'待审核','WaitOuterSent':'待发货','WaitConfirm':'待确认','Question':'异常','Split':'已拆分','Merged':'已合并'};
+                    if (typeof Chart !== 'undefined' && document.getElementById('statusChart')) {
+                        new Chart(document.getElementById('statusChart'), {
+                            type: 'doughnut',
+                            data: {
+                                labels: data.status.map(function(s) { return nameMap[s.status] || s.status; }),
+                                datasets: [{ data: data.status.map(function(s) { return s.cnt; }),
+                                    backgroundColor: data.status.map(function(s) { return colorMap[s.status] || '#9e9e9e'; }),
+                                    borderWidth: 0 }]
+                            },
+                            options: { responsive: true, cutout: '60%',
+                                plugins: { legend: { position: 'right', labels: { color: '#7ec8e3', padding: 12 } } } }
+                        });
+                    }
+                } catch(e) {
+                    console.error('Status chart error:', e);
+                    document.getElementById('statusChart').outerHTML = '<div style="color:#ff6b6b;text-align:center;padding:20px;">状态图加载失败: ' + e.message + '</div>';
+                }
             }
 
             // 店铺利润表
