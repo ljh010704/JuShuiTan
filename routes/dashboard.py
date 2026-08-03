@@ -83,10 +83,44 @@ def api_dashboard_data():
             LIMIT 10
         """).fetchall()
 
-        # 按月趋势
-        monthly = conn.execute("""
+        # 趋势数据（根据日期范围动态分组）
+        if start and end:
+            date_clause = " AND substr(created_at,1,10) BETWEEN ? AND ?"
+            date_params = [start, end]
+        else:
+            date_clause = ""
+            date_params = []
+        
+        # 计算日期范围天数
+        if start and end:
+            from datetime import datetime
+            d1 = datetime.strptime(start, '%Y-%m-%d')
+            d2 = datetime.strptime(end, '%Y-%m-%d')
+            days = (d2 - d1).days
+        else:
+            days = 365
+        
+        # 根据范围选择分组方式
+        if days <= 1:
+            # 按小时
+            group_by = "substr(created_at, 1, 13)"
+            label_format = "hour"
+        elif days <= 31:
+            # 按天
+            group_by = "substr(created_at, 1, 10)"
+            label_format = "day"
+        elif days <= 90:
+            # 按周
+            group_by = "strftime('%Y-W%w', created_at)"
+            label_format = "week"
+        else:
+            # 按月
+            group_by = "substr(created_at, 1, 7)"
+            label_format = "month"
+        
+        monthly = conn.execute(f"""
             SELECT
-                substr(created_at, 1, 7) as month,
+                {group_by} as period,
                 COUNT(*) as orders,
                 COALESCE(SUM(pay_amount), 0) as amount,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
@@ -95,9 +129,10 @@ def api_dashboard_data():
               AND order_type LIKE '%分销Plus%'
               AND order_type NOT LIKE '%供销%'
               AND order_type NOT LIKE '%自发%'
-            GROUP BY month
-            ORDER BY month
-        """).fetchall()
+              {date_clause}
+            GROUP BY period
+            ORDER BY period
+        """, date_params).fetchall()
 
         # 订单状态分布
         status_dist = conn.execute("""

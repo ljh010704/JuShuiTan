@@ -350,7 +350,7 @@
             <div class="title-time"><span class="pulse-dot"></span>实时数据</div>
         </div>
         <div class="range-bar">
-            <button class="range-btn active" data-range="month">近一个月</button>
+            <button class="range-btn active" data-range="current_month">本月</button><button class="range-btn" data-range="month">近一个月</button>
             <button class="range-btn" data-range="3months">近三个月</button>
             <button class="range-btn" data-range="6months">近六个月</button>
             <button class="range-btn" data-range="year">近一年</button>
@@ -402,7 +402,7 @@
         <!-- 图表 -->
         <div class="charts-row">
             <div class="chart-box">
-                <h3>📈 月度销售与利润趋势</h3>
+                <h3 id="trendChartTitle">📈 销售与利润趋势</h3>
                 <canvas id="trendChart"></canvas>
             </div>
             <div class="chart-box">
@@ -441,7 +441,7 @@
     <div class="bottom-border"></div>
 
     <script>
-    let currentRange = 'month';
+    let currentRange = 'current_month';
     let startDate = '';
     let endDate = '';
 
@@ -459,8 +459,9 @@
         const today = new Date();
         endDate = today.toISOString().split('T')[0];
         if (range === 'all') { startDate = ''; endDate = ''; return; }
-        const d = new Date(today);
-        if (range === 'month') d.setMonth(d.getMonth() - 1);
+        var d = new Date(today);
+        if (range === 'current_month') { d.setDate(1); startDate = d.toISOString().split('T')[0]; }
+        else if (range === 'month') { d.setMonth(d.getMonth() - 1); startDate = d.toISOString().split('T')[0]; }
         else if (range === '3months') d.setMonth(d.getMonth() - 3);
         else if (range === '6months') d.setMonth(d.getMonth() - 6);
         else if (range === 'year') d.setFullYear(d.getFullYear() - 1);
@@ -477,7 +478,9 @@
 
             // 数字动画
             animateNumber('totalOrders', data.total.total_orders);
-            animateNumber('totalAmount', (data.total.total_amount / 10000).toFixed(1));
+            var totalAmt = data.total.total_amount || 0;
+            var amountText = totalAmt >= 10000 ? (totalAmt / 10000).toFixed(1) + '万' : totalAmt.toFixed(2) + '元';
+            animateNumber('totalAmount', amountText);
             animateNumber('totalProfit', data.total.total_profit.toFixed(0));
             animateNumber('distOrders', data.total.dist_orders);
             animateNumber('shopCount', data.shops.length);
@@ -487,7 +490,7 @@
                 var ym = document.getElementById('monthPicker').value;
                 label = ym ? ym + '月份' : '选择月份';
             } else {
-                var labelMap = {'month': '近一个月', '3months': '近三个月', '6months': '近六个月', 'year': '近一年', 'all': '全部'};
+                var labelMap = {'current_month': '本月', 'month': '近一个月', '3months': '近三个月', '6months': '近六个月', 'year': '近一年', 'all': '全部'};
                 label = labelMap[currentRange] || '今日';
             }
             document.getElementById('rangeLabel').textContent = label + '订单';
@@ -507,9 +510,9 @@
                     data: {
                         labels: data.monthly.map(d => d.month),
                         datasets: [
-                            { label: '销售额(万)', data: data.monthly.map(d => (d.amount/10000).toFixed(1)),
+                            { label: '销售额', data: data.monthly.map(d => (d.amount/10000).toFixed(1)),
                               borderColor: '#00d4ff', backgroundColor: gradient1, fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#00d4ff' },
-                            { label: '利润(万)', data: data.monthly.map(d => (d.profit/10000).toFixed(2)),
+                            { label: '利润', data: data.monthly.map(d => (d.profit/10000).toFixed(2)),
                               borderColor: '#00ff7f', backgroundColor: gradient2, fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#00ff7f' }
                         ]
                     },
@@ -518,6 +521,18 @@
                                   y: { ticks: { color: '#7ec8e3' }, grid: { color: 'rgba(0,212,255,0.1)' } } } }
                 });
             }
+
+            // Update trend chart title based on range
+            var trendTitles = {
+                'current_month': '📈 ' + (startDate ? startDate.substring(0, 7) : '') + '月 销售与利润趋势',
+                'month': '📈 近30天销售与利润趋势',
+                '3months': '📈 近三个月销售与利润趋势',
+                '6months': '📈 近六个月销售与利润趋势',
+                'year': '📈 近一年销售与利润趋势',
+                'all': '📈 全部销售与利润趋势'
+            };
+            var trendTitle = currentMode === 'month' ? '📈 ' + (document.getElementById('monthPicker').value || '') + ' 销售与利润趋势' : (trendTitles[currentRange] || '📈 销售与利润趋势');
+            document.getElementById('trendChartTitle').textContent = trendTitle;
 
             // 店铺TOP10
             if (data.shops.length > 0) {
