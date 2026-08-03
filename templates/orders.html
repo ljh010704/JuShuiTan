@@ -15,11 +15,12 @@
     <span>共 {{ total }} 条记录</span>
     <select id="statusFilter" onchange="filterByStatus(this.value)">
         <option value="">全部状态</option>
-        <option value="待审核">待审核</option>
-        <option value="已审核">已审核</option>
-        <option value="已发货">已发货</option>
-        <option value="已完成">已完成</option>
-        <option value="已取消">已取消</option>
+        <option value="Sent">已发货</option>
+        <option value="WaitOuterSent">待发货</option>
+        <option value="Cancelled">已取消</option>
+        <option value="Question">异常</option>
+        <option value="Split">已拆分</option>
+        <option value="Merged">已合并</option>
     </select>
 </div>
 
@@ -137,7 +138,7 @@ async function showOrderDetail(orderId) {
                     <div><label>应付金额:</label> <span style="color:var(--accent-green)">¥${(res.pay_amount || 0).toFixed(2)}</span></div>
                     <div><label>运费:</label> <span>¥${(res.freight || 0).toFixed(2)}</span></div>
                     <div><label>采购成本:</label> <span style="color:var(--accent-orange)">¥${(res.purchase_cost || 0).toFixed(2)}</span></div>
-                    <div><label>利润:</label> <span style="color:var(--accent-green)">¥${(res.profit || 0).toFixed(2)}</span></div>
+<div><label>利润:</label> <span style="color:var(--accent-green)"></span></div>
                     <div><label>折扣:</label> <span>¥${(res.discount_amount || 0).toFixed(2)}</span></div>
                     <div><label>创建时间:</label> <span>${res.created_at || '-'}</span></div>
                     <div><label>付款时间:</label> <span>${res.paid_at || '-'}</span></div>
