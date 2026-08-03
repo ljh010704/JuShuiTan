@@ -98,6 +98,24 @@
             color: #fff;
             box-shadow: 0 0 10px rgba(0,212,255,0.3);
         }
+        .range-separator {
+            color: rgba(0,212,255,0.3);
+            margin: 0 5px;
+        }
+        .month-input {
+            padding: 5px 10px;
+            border: 1px solid rgba(0,212,255,0.3);
+            background: rgba(0,212,255,0.1);
+            color: #fff;
+            border-radius: 20px;
+            font-size: 13px;
+            color-scheme: dark;
+            cursor: pointer;
+        }
+        .month-input::-webkit-calendar-picker-indicator {
+            filter: invert(0.7) sepia(1) saturate(3) hue-rotate(170deg);
+            cursor: pointer;
+        }
         .title-time {
             position: absolute;
             right: 0;
@@ -337,6 +355,8 @@
             <button class="range-btn" data-range="6months">近六个月</button>
             <button class="range-btn" data-range="year">近一年</button>
             <button class="range-btn" data-range="all">全部</button>
+            <span class="range-separator">|</span>
+            <input type="month" id="monthPicker" class="month-input" onchange="selectMonth(this.value)">
         </div>
 
         <!-- 统计卡片 -->
@@ -426,6 +446,16 @@
     let endDate = '';
 
     function calcDates(range) {
+        if (currentMode === 'month') {
+            var ym = document.getElementById('monthPicker').value;
+            if (ym) {
+                startDate = ym + '-01';
+                var parts = ym.split('-');
+                var d = new Date(parseInt(parts[0]), parseInt(parts[1]), 0);
+                endDate = ym + '-' + String(d.getDate()).padStart(2, '0');
+                return;
+            }
+        }
         const today = new Date();
         endDate = today.toISOString().split('T')[0];
         if (range === 'all') { startDate = ''; endDate = ''; return; }
@@ -452,8 +482,15 @@
             animateNumber('distOrders', data.total.dist_orders);
             animateNumber('shopCount', data.shops.length);
             document.getElementById('todayOrders').textContent = data.today.orders;
-            var labelMap = {'month': '近一个月', '3months': '近三个月', '6months': '近六个月', 'year': '近一年', 'all': '全部'};
-            document.getElementById('rangeLabel').textContent = (labelMap[currentRange] || '今日') + '订单';
+            var label = '';
+            if (currentMode === 'month') {
+                var ym = document.getElementById('monthPicker').value;
+                label = ym ? ym + '月份' : '选择月份';
+            } else {
+                var labelMap = {'month': '近一个月', '3months': '近三个月', '6months': '近六个月', 'year': '近一年', 'all': '全部'};
+                label = labelMap[currentRange] || '今日';
+            }
+            document.getElementById('rangeLabel').textContent = label + '订单';
 
             // 趋势图
             if (data.monthly.length > 0) {
@@ -549,16 +586,30 @@
         }, 30);
     }
 
+    var currentMode = 'range'; // 'range' or 'month'
+
+    function selectMonth(ym) {
+        if (!ym) return;
+        document.querySelectorAll('.range-btn').forEach(function(b) { b.classList.remove('active'); });
+        currentMode = 'month';
+        loadData();
+    }
+
     // Range button handlers
     document.querySelectorAll('.range-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
             document.querySelectorAll('.range-btn').forEach(function(b) { b.classList.remove('active'); });
             this.classList.add('active');
             currentRange = this.getAttribute('data-range');
+            currentMode = 'range';
+            document.getElementById('monthPicker').value = '';
             loadData();
         });
     });
 
+    // Set default month picker to current month
+    var now = new Date();
+    document.getElementById('monthPicker').value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
     loadData();
     setInterval(loadData, 60000);
     
