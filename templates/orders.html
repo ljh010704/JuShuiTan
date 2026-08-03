@@ -48,8 +48,8 @@
             <td>¥{{ "%.2f"|format(order.pay_amount or 0) }}</td>
             <td>¥{{ "%.2f"|format(order.freight or 0) }}</td>
             <td>
-                <span class="badge badge-{{ 'success' if 'Finished' in (order.status or '') or 'Completed' in (order.status or '') else 'info' if 'Shipped' in (order.status or '') else 'danger' if 'Cancelled' in (order.status or '') else 'warning' }}">
-                {% if 'Cancelled' in (order.status or '') %}已取消{% elif 'Shipped' in (order.status or '') or 'Sent' in (order.status or '') %}已发货{% elif 'Finished' in (order.status or '') or 'Completed' in (order.status or '') %}已完成{% elif 'WaitCheck' in (order.status or '') %}待审核{% elif 'WaitSend' in (order.status or '') %}待发货{% else %}{{ order.status or '-' }}{% endif %}
+                <span class="badge badge-{{ 'success' if 'Finished' in (order.status or '') or 'Completed' in (order.status or '') else 'info' if 'Shipped' in (order.status or '') or 'Sent' in (order.status or '') else 'warning' if 'WaitOuterSent' in (order.status or '') else 'danger' if 'Cancelled' in (order.status or '') else 'secondary' }}">
+                {% if 'Cancelled' in (order.status or '') %}已取消{% elif 'Shipped' in (order.status or '') or 'Sent' in (order.status or '') %}已发货{% elif 'Finished' in (order.status or '') or 'Completed' in (order.status or '') %}已完成{% elif 'WaitOuterSent' in (order.status or '') %}待发货{% elif 'WaitCheck' in (order.status or '') %}待审核{% elif 'Question' in (order.status or '') %}异常{% elif 'Split' in (order.status or '') %}已拆分{% elif 'Merged' in (order.status or '') %}已合并{% else %}{{ order.status or '-' }}{% endif %}
                 </span>
             </td>
             <td>{{ order.created_at[:16] if order.created_at else '-' }}</td>
