@@ -43,7 +43,7 @@ def api_dashboard_data():
             FROM orders{date_filter}{status_filter}
         """, date_params).fetchone()
 
-        # 统计天数
+        # 日期范围统计
         if start and end:
             today_clause = "WHERE substr(created_at, 1, 10) BETWEEN ? AND ?"
             today_params = [start, end]
