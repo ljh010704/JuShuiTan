@@ -31,6 +31,7 @@ def api_suppliers():
                 MAX(created_at) as last_order
             FROM orders
             WHERE json_extract(raw_data, '$.supplierName') IS NOT NULL
+              AND status IN ('Sent', 'WaitOuterSent')
             GROUP BY supplier_co_id
             ORDER BY order_count DESC
         """).fetchall()

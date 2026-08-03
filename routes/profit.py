@@ -34,8 +34,7 @@ def api_profit_summary():
                     ELSE 0 END as profit_rate
             FROM orders
             WHERE created_at LIKE ?
-              AND status NOT LIKE '%Cancel%'
-              AND status NOT LIKE '%Returned%' 
+              AND status IN ('Sent', 'WaitOuterSent')
         """, (f"{date}%",)).fetchone()
         return jsonify(dict(row) if row else {})
     finally:
@@ -86,8 +85,7 @@ def api_profit_by_shop():
                     ELSE 0 END as profit_rate
             FROM orders
             WHERE created_at LIKE ?
-              AND status NOT LIKE '%Cancel%'
-              AND status NOT LIKE '%Returned%' 
+              AND status IN ('Sent', 'WaitOuterSent')
             GROUP BY shop_name
             ORDER BY profit DESC
         """, (f"{date}%",)).fetchall()

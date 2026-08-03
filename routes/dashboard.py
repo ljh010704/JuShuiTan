@@ -28,9 +28,9 @@ def api_dashboard_data():
             date_filter = " WHERE substr(created_at, 1, 10) BETWEEN ? AND ?"
             date_params = [start, end]
 
-        status_filter = " WHERE status NOT LIKE '%Cancel%' AND status NOT LIKE '%Returned%'"
+        status_filter = " WHERE status IN ('Sent', 'WaitOuterSent')"
         if date_filter:
-            status_filter = " AND status NOT LIKE '%Cancel%' AND status NOT LIKE '%Returned%'"
+            status_filter = " AND status IN ('Sent', 'WaitOuterSent')"
         order_filter = " WHERE order_type LIKE '%分销Plus%' AND order_type NOT LIKE '%供销%' AND order_type NOT LIKE '%自发%'"
         if date_filter or status_filter:
             order_filter = " AND order_type LIKE '%分销Plus%' AND order_type NOT LIKE '%供销%' AND order_type NOT LIKE '%自发%'"
@@ -60,8 +60,7 @@ def api_dashboard_data():
                 COALESCE(SUM(pay_amount), 0) as amount,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
             FROM orders {today_clause}
-              AND status NOT LIKE '%Cancel%'
-              AND status NOT LIKE '%Returned%'
+              AND status IN ('Sent', 'WaitOuterSent')
               AND order_type LIKE '%分销Plus%'
               AND order_type NOT LIKE '%供销%'
               AND order_type NOT LIKE '%自发%'
@@ -75,8 +74,7 @@ def api_dashboard_data():
                 COALESCE(SUM(pay_amount), 0) as amount,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
             FROM orders
-            WHERE status NOT LIKE '%Cancel%'
-              AND status NOT LIKE '%Returned%'
+            WHERE status IN ('Sent', 'WaitOuterSent')
               AND order_type LIKE '%分销Plus%'
               AND order_type NOT LIKE '%供销%'
               AND order_type NOT LIKE '%自发%'
@@ -93,8 +91,7 @@ def api_dashboard_data():
                 COALESCE(SUM(pay_amount), 0) as amount,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
             FROM orders WHERE created_at != ""
-              AND status NOT LIKE '%Cancel%'
-              AND status NOT LIKE '%Returned%'
+              AND status IN ('Sent', 'WaitOuterSent')
               AND order_type LIKE '%分销Plus%'
               AND order_type NOT LIKE '%供销%'
               AND order_type NOT LIKE '%自发%'
