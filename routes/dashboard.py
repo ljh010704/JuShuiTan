@@ -31,6 +31,9 @@ def api_dashboard_data():
         status_filter = " WHERE status NOT LIKE '%Cancel%' AND status NOT LIKE '%Returned%'"
         if date_filter:
             status_filter = " AND status NOT LIKE '%Cancel%' AND status NOT LIKE '%Returned%'"
+        order_filter = " WHERE order_type LIKE '%分销Plus%' AND order_type NOT LIKE '%供销%' AND order_type NOT LIKE '%自发%'"
+        if date_filter or status_filter:
+            order_filter = " AND order_type LIKE '%分销Plus%' AND order_type NOT LIKE '%供销%' AND order_type NOT LIKE '%自发%'"
 
         # 整体统计
         total = conn.execute(f"""
@@ -40,7 +43,7 @@ def api_dashboard_data():
                 COALESCE(SUM(pay_amount), 0) as total_amount,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as total_profit,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END), 0) as total_cost
-            FROM orders{date_filter}{status_filter}
+            FROM orders{date_filter}{status_filter}{order_filter}
         """, date_params).fetchone()
 
         # 日期范围统计
@@ -59,6 +62,9 @@ def api_dashboard_data():
             FROM orders {today_clause}
               AND status NOT LIKE '%Cancel%'
               AND status NOT LIKE '%Returned%'
+              AND order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
         """, today_params).fetchone()
 
         # 按店铺统计
@@ -71,6 +77,9 @@ def api_dashboard_data():
             FROM orders
             WHERE status NOT LIKE '%Cancel%'
               AND status NOT LIKE '%Returned%'
+              AND order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
             GROUP BY shop_name
             ORDER BY amount DESC
             LIMIT 10
@@ -86,6 +95,9 @@ def api_dashboard_data():
             FROM orders WHERE created_at != ""
               AND status NOT LIKE '%Cancel%'
               AND status NOT LIKE '%Returned%'
+              AND order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
             GROUP BY month
             ORDER BY month
         """).fetchall()
