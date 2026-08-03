@@ -133,7 +133,7 @@ async function showOrderDetail(orderId) {
                     <div><label>线上单号:</label> <span>${res.external_id || '-'}</span></div>
                     <div><label>店铺:</label> <span>${res.shop_name || res.shop_id || '-'}</span></div>
                     <div><label>类型:</label> <span>${res.order_type || '-'}</span></div>
-                    <div><label>状态:</label> <span>${res.status || '-'}</span></div>
+                    <div><label>状态:</label> <span>${({Sent:'已发货',WaitOuterSent:'待发货',Cancelled:'已取消',Question:'异常',Split:'已拆分',Merged:'已合并',WaitConfirm:'待确认'}[res.status] || res.status || '-')}</span></div>
                     <div><label>商品数:</label> <span>${res.item_count || 0}</span></div>
                     <div><label>应付金额:</label> <span style="color:var(--accent-green)">¥${(res.pay_amount || 0).toFixed(2)}</span></div>
                     <div><label>运费:</label> <span>¥${(res.freight || 0).toFixed(2)}</span></div>
