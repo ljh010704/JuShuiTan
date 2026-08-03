@@ -451,8 +451,8 @@
             if (ym) {
                 startDate = ym + '-01';
                 var parts = ym.split('-');
-                var d = new Date(parseInt(parts[0]), parseInt(parts[1]), 0);
-                endDate = ym + '-' + String(d.getDate()).padStart(2, '0');
+                var lastDay = new Date(parseInt(parts[0]), parseInt(parts[1]), 0);
+                endDate = ym + '-' + String(lastDay.getDate()).padStart(2, '0');
                 return;
             }
         }
