@@ -8,7 +8,7 @@ cursor = conn.cursor()
 
 print("Before fix:")
 for row in cursor.execute("SELECT order_id, pay_amount, purchase_cost, profit FROM orders LIMIT 3").fetchall():
-    print("  order_id=%s, pay=%s, cost=%s, profit=%s" % row)
+    print("  order_id=%s, pay=%s, cost=%s, profit=%s" % (row[0], row[1], row[2], row[3]))
 
 cursor.execute("""
     UPDATE orders SET 
@@ -21,11 +21,11 @@ conn.commit()
 
 print("\nAfter fix:")
 for row in cursor.execute("SELECT order_id, pay_amount, purchase_cost, profit FROM orders LIMIT 3").fetchall():
-    print("  order_id=%s, pay=%s, cost=%s, profit=%s" % row)
+    print("  order_id=%s, pay=%s, cost=%s, profit=%s" % (row[0], row[1], row[2], row[3]))
 
 print("\nOrder 686139:")
 for row in cursor.execute("SELECT order_id, pay_amount, purchase_cost, profit FROM orders WHERE order_id = '686139'").fetchall():
-    print("  pay=%s, cost=%s, profit=%s" % row)
+    print("  pay=%s, cost=%s, profit=%s" % (row[1], row[2], row[3]))
 
 conn.close()
 print("\nDone!")
