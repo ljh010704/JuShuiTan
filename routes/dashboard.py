@@ -93,7 +93,6 @@ def api_dashboard_data():
         
         # 计算日期范围天数
         if start and end:
-            from datetime import datetime
             d1 = datetime.strptime(start, '%Y-%m-%d')
             d2 = datetime.strptime(end, '%Y-%m-%d')
             days = (d2 - d1).days
