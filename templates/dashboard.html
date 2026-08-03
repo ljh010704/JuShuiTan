@@ -537,10 +537,8 @@
 
             // 状态分布
             if (data.status.length > 0) {
-                const colorMap = {'Cancelled':'#ff6b6b','Shipped':'#00d4ff','Sent':'#00d4ff',
-                                  'Finished':'#00ff7f','Completed':'#00ff7f','WaitCheck':'#ff9800'};
-                const nameMap = {'Cancelled':'已取消','Shipped':'已发货','Sent':'已发货',
-                                'Finished':'已完成','Completed':'已完成','WaitCheck':'待审核','WaitOuterSent':'待发出','WaitConfirm':'待确认','Question':'异常'};
+                const colorMap = {'Cancelled':'#ff6b6b','Shipped':'#00d4ff','Sent':'#00d4ff','Finished':'#00ff7f','Completed':'#00ff7f','WaitCheck':'#ff9800','WaitOuterSent':'#ff9800','WaitConfirm':'#ff9800','Question':'#ff6b6b','Split':'#9e9e9e','Merged':'#9e9e9e'};
+                const nameMap = {'Cancelled':'已取消','Shipped':'已发货','Sent':'已发货','Finished':'已完成','Completed':'已完成','WaitCheck':'待审核','WaitOuterSent':'待发货','WaitConfirm':'待确认','Question':'异常','Split':'已拆分','Merged':'已合并'};
                 new Chart(document.getElementById('statusChart'), {
                     type: 'doughnut',
                     data: {

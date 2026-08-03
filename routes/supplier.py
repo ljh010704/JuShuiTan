@@ -32,6 +32,9 @@ def api_suppliers():
             FROM orders
             WHERE json_extract(raw_data, '$.supplierName') IS NOT NULL
               AND status IN ('Sent', 'WaitOuterSent')
+              AND order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
             GROUP BY supplier_co_id
             ORDER BY order_count DESC
         """).fetchall()

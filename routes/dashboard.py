@@ -101,7 +101,11 @@ def api_dashboard_data():
 
         # 订单状态分布
         status_dist = conn.execute("""
-            SELECT status, COUNT(*) as cnt FROM orders GROUP BY status ORDER BY cnt DESC LIMIT 5
+            SELECT status, COUNT(*) as cnt FROM orders 
+            WHERE order_type LIKE '%分销Plus%' 
+              AND order_type NOT LIKE '%供销%' 
+              AND order_type NOT LIKE '%自发%'
+            GROUP BY status ORDER BY cnt DESC LIMIT 5
         """).fetchall()
 
         # 售后统计
