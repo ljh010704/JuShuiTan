@@ -66,30 +66,32 @@ def api_dashboard_data():
               AND order_type NOT LIKE '%自发%'
         """, today_params).fetchone()
 
-        # 按店铺统计
-        shops = conn.execute("""
-            SELECT
-                shop_name,
-                COUNT(*) as order_count,
-                COALESCE(SUM(pay_amount), 0) as amount,
-                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
-            FROM orders
-            WHERE status IN ('Sent', 'WaitOuterSent')
-              AND order_type LIKE '%分销Plus%'
-              AND order_type NOT LIKE '%供销%'
-              AND order_type NOT LIKE '%自发%'
-            GROUP BY shop_name
-            ORDER BY amount DESC
-            LIMIT 10
-        """).fetchall()
-
-        # 趋势数据（根据日期范围动态分组）
+        # 趋势/店铺/状态共用的日期过滤
         if start and end:
             date_clause = " AND substr(created_at,1,10) BETWEEN ? AND ?"
             date_params = [start, end]
         else:
             date_clause = ""
             date_params = []
+
+        # 按店铺统计
+        shops = conn.execute(f"""
+            SELECT
+                shop_name,
+                COUNT(*) as order_count,
+                COALESCE(SUM(pay_amount), 0) as amount,
+                COALESCE(SUM(pay_amount - purchase_cost), 0) as profit
+            FROM orders
+            WHERE status IN ('Sent', 'WaitOuterSent')
+              AND order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
+              {date_clause}
+            GROUP BY shop_name
+            ORDER BY amount DESC
+            LIMIT 10
+        """, date_params).fetchall()
+
         
         # 计算日期范围天数
         if start and end:
@@ -122,7 +124,7 @@ def api_dashboard_data():
                 {group_by} as period,
                 COUNT(*) as orders,
                 COALESCE(SUM(pay_amount), 0) as amount,
-                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as profit
+                COALESCE(SUM(pay_amount - purchase_cost), 0) as profit
             FROM orders WHERE created_at != ""
               AND status IN ('Sent', 'WaitOuterSent')
               AND order_type LIKE '%分销Plus%'
@@ -134,18 +136,20 @@ def api_dashboard_data():
         """, date_params).fetchall()
 
         # 订单状态分布
-        status_dist = conn.execute("""
-            SELECT status, COUNT(*) as cnt FROM orders 
-            WHERE order_type LIKE '%分销Plus%' 
-              AND order_type NOT LIKE '%供销%' 
+        status_dist = conn.execute(f"""
+            SELECT status, COUNT(*) as cnt FROM orders
+            WHERE order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
               AND order_type NOT LIKE '%自发%'
-            GROUP BY status ORDER BY cnt DESC LIMIT 5
-        """).fetchall()
+              {date_clause}
+            GROUP BY status ORDER BY cnt DESC
+        """, date_params).fetchall()
 
         # 售后统计
-        after_sale = conn.execute("""
+        after_sale = conn.execute(f"""
             SELECT COUNT(*) as total, COALESCE(SUM(amount), 0) as refund_amount FROM after_sales
-        """).fetchone()
+            WHERE 1=1 {date_clause}
+        """, date_params).fetchone()
 
         return jsonify({
             'total': dict(total),

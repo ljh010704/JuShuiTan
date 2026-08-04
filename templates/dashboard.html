@@ -508,11 +508,11 @@
                 new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: data.monthly.map(d => d.month),
+                        labels: data.monthly.map(d => d.period || d.month),
                         datasets: [
-                            { label: '销售额', data: data.monthly.map(d => (d.amount/10000).toFixed(1)),
+                            { label: '销售额(元)', data: data.monthly.map(d => Number(d.amount.toFixed(2))),
                               borderColor: '#00d4ff', backgroundColor: gradient1, fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#00d4ff' },
-                            { label: '利润', data: data.monthly.map(d => (d.profit/10000).toFixed(2)),
+                            { label: '利润(元)', data: data.monthly.map(d => Number(d.profit.toFixed(2))),
                               borderColor: '#00ff7f', backgroundColor: gradient2, fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#00ff7f' }
                         ]
                     },
@@ -586,7 +586,7 @@
             const mt = document.getElementById('monthlyTable');
             mt.innerHTML = data.monthly.map(m => {
                 const rate = m.amount > 0 ? (m.profit / m.amount * 100).toFixed(1) : '0.0';
-                return `<tr><td>${m.month}</td><td>${m.orders}</td><td>¥${m.amount.toLocaleString()}</td>
+                return `<tr><td>${m.period || m.month || ''}</td><td>${m.orders}</td><td>¥${m.amount.toLocaleString()}</td>
                     <td class="profit">¥${m.profit.toFixed(2)}</td><td>${rate}%</td></tr>`;
             }).join('');
 
@@ -595,14 +595,19 @@
 
     function animateNumber(id, target) {
         const el = document.getElementById(id);
-        const num = parseFloat(target);
-        if (isNaN(num)) { el.textContent = target; return; }
+        const str = String(target);
+        const m = str.match(/^([\d.,]+)(.*)$/);
+        if (!m) { el.textContent = str; return; }
+        const num = parseFloat(m[1].replace(/,/g, ''));
+        const suffix = m[2] || '';
+        if (isNaN(num)) { el.textContent = str; return; }
+        const decimals = (m[1].split('.')[1] || '').length;
         let current = 0;
         const step = num / 30;
         const timer = setInterval(() => {
             current += step;
             if (current >= num) { current = num; clearInterval(timer); }
-            el.textContent = Number.isInteger(num) ? Math.floor(current).toLocaleString() : current.toFixed(1);
+            el.textContent = (decimals > 0 ? current.toFixed(decimals) : Math.floor(current).toLocaleString()) + suffix;
         }, 30);
     }
 

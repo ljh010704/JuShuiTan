@@ -54,7 +54,10 @@ def _run_with_retries(func, retries=1, backoff=2):
 
 async def _sync_account_once(account, sync_type):
     """Sync one account once and return (count, errors)."""
-    from config import JUSHUITAN_URL, BROWSER
+    try:
+        from config import JUSHUITAN_URL, BROWSER
+    except ImportError:
+        raise RuntimeError('缺少 config.py 配置文件，请参照 config.example.py 创建')
 
     account_name = account.get('name', account['username'])
     logger.info(f"\n{'=' * 50}")
@@ -157,7 +160,10 @@ async def _sync_account_once(account, sync_type):
 
 async def _run_sync(sync_type, config):
     """异步执行同步 - 单次调用"""
-    from config import ACCOUNTS, MEMORY
+    try:
+        from config import ACCOUNTS, MEMORY
+    except ImportError:
+        raise RuntimeError('缺少 config.py 配置文件，请参照 config.example.py 创建')
 
     # 低内存模式检查
     if MEMORY.get('low_memory_mode', True):
@@ -230,7 +236,10 @@ def api_sync():
     data = request.get_json() or {}
     sync_type = data.get('type', 'full')
 
-    from config import ACCOUNTS, JUSHUITAN_URL, BROWSER
+    try:
+        from config import ACCOUNTS, JUSHUITAN_URL, BROWSER
+    except ImportError:
+        return jsonify({'success': False, 'message': '缺少 config.py 配置文件，请参照 config.example.py 创建'})
     if not ACCOUNTS:
         return jsonify({'success': False, 'message': '未配置账号，请先添加聚水潭账号'})
 

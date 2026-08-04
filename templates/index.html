@@ -41,8 +41,8 @@
         <div class="stat-value">{{ order_stats.shipped_orders or 0 }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">已完成</div>
-        <div class="stat-value">{{ order_stats.completed_orders or 0 }}</div>
+        <div class="stat-label">待发货</div>
+        <div class="stat-value">{{ order_stats.pending_orders or 0 }}</div>
     </div>
 </div>
 
@@ -84,7 +84,12 @@
                 <td>{{ order.external_id or order.order_id }}</td>
                 <td>{{ order.shop_name or order.shop_id }}</td>
                 <td>¥{{ "%.2f"|format(order.pay_amount or 0) }}</td>
-                <td><span class="badge badge-{{ 'success' if 'Finished' in (order.status or '') or 'Completed' in (order.status or '') else 'info' if 'Shipped' in (order.status or '') else 'danger' if 'Cancelled' in (order.status or '') else 'warning' }}">{% if 'Cancelled' in (order.status or '') %}已取消{% elif 'Shipped' in (order.status or '') or 'Sent' in (order.status or '') %}已发货{% elif 'Finished' in (order.status or '') or 'Completed' in (order.status or '') %}已完成{% else %}{{ order.status or '-' }}{% endif %}</span></td>
+                <td>
+                    {% set st = order.status or '' %}
+                    <span class="badge badge-{{ 'success' if st == 'Sent' else 'info' if st == 'WaitOuterSent' else 'danger' if st in ['Cancelled', 'Question'] else 'warning' }}">
+                        {% if st == 'Sent' %}已发货{% elif st == 'WaitOuterSent' %}待发货{% elif st == 'Cancelled' %}已取消{% elif st == 'Question' %}异常{% elif st == 'Split' %}已拆分{% elif st == 'Merged' %}已合并{% elif st == 'WaitConfirm' %}待确认{% else %}{{ st or '-' }}{% endif %}
+                    </span>
+                </td>
                 <td>{{ order.created_at[:16] if order.created_at else '-' }}</td>
             </tr>
             {% endfor %}
@@ -121,10 +126,25 @@
                 <td>{{ item.external_id or item.order_id or '-' }}</td>
                 <td>{{ item.type or '-' }}</td>
                 <td>¥{{ "%.2f"|format(item.amount or 0) }}</td>
-                <td><span class="badge badge-warning">{{ item.status or '-' }}</span></td>
                 <td>
+                    {% if item.status == 'WaitCheck' %}<span class="badge badge-warning">待审核</span>
+                    {% elif item.status == 'WaitOuterSent' %}<span class="badge badge-warning">待退货</span>
+                    {% elif item.status == 'Agreed' %}<span class="badge badge-success">已同意</span>
+                    {% elif item.status == 'Rejected' %}<span class="badge badge-danger">已拒绝</span>
+                    {% elif item.status == 'Finished' %}<span class="badge badge-success">已完成</span>
+                    {% elif item.status == 'Cancelled' %}<span class="badge badge-secondary">已取消</span>
+                    {% else %}<span class="badge">{{ item.status or '-' }}</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if item.status in ['WaitCheck', 'WaitOuterSent'] and item.type != '未发货退款' %}
                     <button class="btn btn-sm btn-success" onclick="approveAfterSale('{{ item.after_sale_id }}')">同意</button>
                     <button class="btn btn-sm btn-danger" onclick="rejectAfterSale('{{ item.after_sale_id }}')">拒绝</button>
+                    {% elif item.type == '未发货退款' and item.status in ['WaitCheck', 'WaitOuterSent'] %}
+                    <span style="color:#999; font-size:12px;">自动处理</span>
+                    {% else %}
+                    <span style="color:#999; font-size:12px;">-</span>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -202,23 +222,13 @@ if (trendData.length > 0) {
 }
 
 // 订单状态饼图
-const statusData = [
-    {{ order_stats.shipped_orders or 0 }},
-    {{ order_stats.completed_orders or 0 }},
-    {{ order_stats.cancelled_orders or 0 }},
-    {{ order_stats.pending_orders or 0 }}
-];
-const statusLabels = ['已发货', '已完成', '已取消', '待处理'];
-const statusColors = ['#00d4ff', '#00ff88', '#ff4757', '#ff9f43'];
-const filtered = [];
-for (let i = 0; i < statusData.length; i++) {
-    if (statusData[i] > 0) filtered.push({ label: statusLabels[i], value: statusData[i], color: statusColors[i] });
-}
+const statusDist = {{ status_dist | tojson }};
+const statusColorMap = {'已发货':'#00d4ff','待发货':'#ff9f43','已取消':'#ff4757','异常':'#ff6b9d','已拆分':'#9e9e9e','已合并':'#9e9e9e','待确认':'#ffd700'};
 new Chart(document.getElementById('orderStatusChart'), {
     type: 'doughnut',
     data: {
-        labels: filtered.map(f => f.label),
-        datasets: [{ data: filtered.map(f => f.value), backgroundColor: filtered.map(f => f.color), borderWidth: 0 }]
+        labels: statusDist.map(s => s.name),
+        datasets: [{ data: statusDist.map(s => s.value), backgroundColor: statusDist.map(s => statusColorMap[s.name] || '#9e9e9e'), borderWidth: 0 }]
     },
     options: { responsive: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: '#7ec8e3', padding: 12 } } } }
 });
@@ -227,21 +237,21 @@ new Chart(document.getElementById('orderStatusChart'), {
 async function syncData(type) {
     const btn = document.getElementById('syncBtn');
     btn.disabled = true;
-    btn.textContent = '???...';
+    btn.textContent = '同步中...';
     try {
         const res = await apiCall('/api/sync', 'POST', { type });
         if (res.success) {
-            btn.textContent = '?????...';
+            btn.textContent = '同步进行中...';
             startSyncPolls();
         } else {
-            alert('??????: ' + (res.message || '????'));
+            alert('同步启动失败: ' + (res.message || '未知错误'));
             btn.disabled = false;
-            btn.textContent = '????';
+            btn.textContent = '🔃 同步数据';
         }
     } catch(e) {
-        alert('????: ' + e.message);
+        alert('同步失败: ' + e.message);
         btn.disabled = false;
-        btn.textContent = '????';
+        btn.textContent = '🔃 同步数据';
     }
 }
 
@@ -256,7 +266,7 @@ function startSyncPolls() {
                 clearInterval(window._idxSyncPoll);
                 window._idxSyncPoll = null;
                 btn.disabled = false;
-                btn.textContent = '????';
+                btn.textContent = '🔃 同步数据';
                 location.reload();
             }
         } catch(e) {}

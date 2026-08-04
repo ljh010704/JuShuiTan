@@ -67,7 +67,10 @@ def api_suppliers():
 @supplier_bp.route('/api/suppliers/dissolve', methods=['POST'])
 def api_dissolve_suppliers():
     """解除供应商合作关系"""
-    from config import ACCOUNTS, JUSHUITAN_URL, BROWSER
+    try:
+        from config import ACCOUNTS, JUSHUITAN_URL, BROWSER
+    except ImportError:
+        return jsonify({'success': False, 'message': '缺少 config.py 配置文件，请参照 config.example.py 创建'})
     from browser.login import JushuitanLogin
 
     data = request.get_json() or {}

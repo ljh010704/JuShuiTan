@@ -61,7 +61,10 @@ def api_logout():
 
 @accounts_bp.route('/accounts')
 def accounts_page():
-    from config import ACCOUNTS
+    try:
+        from config import ACCOUNTS
+    except ImportError:
+        ACCOUNTS = []
     # 只显示账号名，不显示密码
     account_list = []
     for acc in ACCOUNTS:
@@ -75,7 +78,10 @@ def accounts_page():
 
 @accounts_bp.route('/api/accounts')
 def api_accounts():
-    from config import ACCOUNTS
+    try:
+        from config import ACCOUNTS
+    except ImportError:
+        return jsonify({'success': False, 'message': '缺少 config.py 配置文件，请参照 config.example.py 创建'})
     account_list = []
     for acc in ACCOUNTS:
         account_list.append({

@@ -21,13 +21,13 @@ def api_profit_summary():
     try:
         row = conn.execute("""
             SELECT
-                COUNT(*) as total_orders,
+                COUNT(CASE WHEN order_type LIKE '%分销Plus%' AND order_type NOT LIKE '%供销%' AND order_type NOT LIKE '%自发%' THEN 1 END) as total_orders,
                 COUNT(CASE WHEN order_type LIKE '%分销Plus%' THEN 1 END) as distribution_orders,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN pay_amount ELSE 0 END), 0) as total_revenue,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END), 0) as total_cost,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END), 0) as total_profit,
                 COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN profit ELSE 0 END), 0) as platform_profit,
-                COALESCE(SUM(freight), 0) as total_freight,
+                COALESCE(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN freight ELSE 0 END), 0) as total_freight,
                 CASE WHEN SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN pay_amount ELSE 0 END) > 0
                     THEN ROUND(SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END) * 100.0 /
                               SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN pay_amount ELSE 0 END), 2)
@@ -48,19 +48,24 @@ def api_profit_trend():
     try:
         rows = conn.execute("""
             SELECT
-                date,
-                total_orders,
-                total_amount,
-                total_cost,
-                total_profit,
-                CASE WHEN total_amount > 0
-                    THEN ROUND(total_profit * 100.0 / total_amount, 2)
+                substr(created_at, 1, 10) as date,
+                COUNT(*) as total_orders,
+                COALESCE(SUM(pay_amount), 0) as total_amount,
+                COALESCE(SUM(purchase_cost), 0) as total_cost,
+                COALESCE(SUM(pay_amount - purchase_cost), 0) as total_profit,
+                CASE WHEN SUM(pay_amount) > 0
+                    THEN ROUND(SUM(pay_amount - purchase_cost) * 100.0 / SUM(pay_amount), 2)
                     ELSE 0 END as profit_rate
-            FROM daily_stats
-            ORDER BY date DESC
-            LIMIT ?
-        """, (days,)).fetchall()
-        return jsonify({'data': [dict(r) for r in reversed(rows)]})
+            FROM orders
+            WHERE order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
+              AND status IN ('Sent', 'WaitOuterSent')
+              AND created_at >= date('now', ?)
+            GROUP BY date
+            ORDER BY date
+        """, (f"-{days} days",)).fetchall()
+        return jsonify({'data': [dict(r) for r in rows]})
     finally:
         conn.close()
 

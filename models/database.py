@@ -232,6 +232,9 @@ class OrderModel:
                     COALESCE(SUM(pay_amount - purchase_cost), 0) as total_profit
                 FROM orders WHERE created_at LIKE ?
                   AND status IN ('Sent', 'WaitOuterSent')
+                  AND order_type LIKE '%分销Plus%'
+                  AND order_type NOT LIKE '%供销%'
+                  AND order_type NOT LIKE '%自发%'
             """, (f"{date_str}%",)).fetchone()
             return dict(row) if row else {}
         finally:
@@ -249,6 +252,9 @@ class OrderModel:
                     COALESCE(SUM(pay_amount - purchase_cost), 0) as total_profit
                 FROM orders WHERE substr(created_at,1,10) BETWEEN ? AND ?
                   AND status IN ('Sent', 'WaitOuterSent')
+                  AND order_type LIKE '%分销Plus%'
+                  AND order_type NOT LIKE '%供销%'
+                  AND order_type NOT LIKE '%自发%'
             """, (start_date, end_date)).fetchone()
             return dict(row) if row else {}
         finally:
