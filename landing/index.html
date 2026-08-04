@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>我的项目导航</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100vh;
+    background: radial-gradient(1200px 600px at 20% 10%, rgba(0,212,255,.18), transparent 60%),
+                radial-gradient(1000px 500px at 80% 90%, rgba(0,255,136,.12), transparent 60%),
+                #0b1526;
+    color: #e8f4fd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .wrap { width: 100%; max-width: 880px; text-align: center; }
+  h1 { font-size: 30px; letter-spacing: 1px; margin-bottom: 6px; }
+  .sub { color: #7ec8e3; font-size: 14px; margin-bottom: 36px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+  .card {
+    position: relative;
+    display: block;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(0,212,255,.25);
+    border-radius: 16px;
+    padding: 26px 20px 22px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    overflow: hidden;
+  }
+  .card:hover { transform: translateY(-4px); border-color: #00d4ff; box-shadow: 0 10px 30px rgba(0,212,255,.15); }
+  .icon { font-size: 42px; margin-bottom: 12px; }
+  .name { font-size: 19px; font-weight: 700; margin-bottom: 6px; }
+  .desc { font-size: 13px; color: #9fc3d6; margin-bottom: 14px; line-height: 1.5; }
+  .badge {
+    display: inline-block;
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(0,212,255,.12);
+    border: 1px solid rgba(0,212,255,.35);
+    color: #7fd9f0;
+  }
+  .footer { margin-top: 30px; font-size: 12px; color: #5b7f92; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>🚀 我的项目导航</h1>
+    <div class="sub">选择一个项目进入</div>
+    <div class="grid">
+      <a class="card" href="http://117.72.39.12/" target="_blank">
+        <div class="icon">📚</div>
+        <div class="name">电商实战笔记</div>
+        <div class="desc">技术笔记与实战经验博客</div>
+        <span class="badge">端口 80</span>
+      </a>
+      <a class="card" href="http://117.72.39.12:5000/" target="_blank">
+        <div class="icon">📊</div>
+        <div class="name">聚水潭数据统计中心</div>
+        <div class="desc">订单 / 利润 / 售后统计看板</div>
+        <span class="badge">端口 5000</span>
+      </a>
+      <a class="card" href="http://117.72.39.12:3000/" target="_blank">
+        <div class="icon">🎬</div>
+        <div class="name">抖音订单统计看板</div>
+        <div class="desc">抖音订单数据统计</div>
+        <span class="badge">端口 3000</span>
+      </a>
+    </div>
+    <div class="footer">服务器：117.72.39.12</div>
+  </div>
+</body>
+</html>
