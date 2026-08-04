@@ -18,12 +18,11 @@
     justify-content: center;
     padding: 24px;
   }
-  .wrap { width: 100%; max-width: 880px; text-align: center; }
+  .wrap { width: 100%; max-width: 980px; text-align: center; }
   h1 { font-size: 30px; letter-spacing: 1px; margin-bottom: 6px; }
   .sub { color: #7ec8e3; font-size: 14px; margin-bottom: 36px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
   .card {
-    position: relative;
     display: block;
     background: rgba(255,255,255,.05);
     border: 1px solid rgba(0,212,255,.25);
@@ -32,7 +31,6 @@
     text-decoration: none;
     color: inherit;
     transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    overflow: hidden;
   }
   .card:hover { transform: translateY(-4px); border-color: #00d4ff; box-shadow: 0 10px 30px rgba(0,212,255,.15); }
   .icon { font-size: 42px; margin-bottom: 12px; }
@@ -55,11 +53,11 @@
     <h1>🚀 我的项目导航</h1>
     <div class="sub">选择一个项目进入</div>
     <div class="grid">
-      <a class="card" href="http://117.72.39.12/" target="_blank">
+      <a class="card" href="http://117.72.39.12:8080/" target="_blank">
         <div class="icon">📚</div>
         <div class="name">电商实战笔记</div>
         <div class="desc">技术笔记与实战经验博客</div>
-        <span class="badge">端口 80</span>
+        <span class="badge">端口 8080</span>
       </a>
       <a class="card" href="http://117.72.39.12:5000/" target="_blank">
         <div class="icon">📊</div>
@@ -72,6 +70,12 @@
         <div class="name">抖音订单统计看板</div>
         <div class="desc">抖音订单数据统计</div>
         <span class="badge">端口 3000</span>
+      </a>
+      <a class="card" href="http://117.72.39.12:8081/" target="_blank">
+        <div class="icon">💰</div>
+        <div class="name">税务自动化</div>
+        <div class="desc">税务相关自动化工具</div>
+        <span class="badge">端口 8081</span>
       </a>
     </div>
     <div class="footer">服务器：117.72.39.12</div>
