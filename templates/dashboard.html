@@ -456,16 +456,19 @@
                 return;
             }
         }
+        function fmtLocal(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
         const today = new Date();
-        endDate = today.toISOString().split('T')[0];
+        endDate = fmtLocal(today);
         if (range === 'all') { startDate = ''; endDate = ''; return; }
         var d = new Date(today);
-        if (range === 'current_month') { d.setDate(1); startDate = d.toISOString().split('T')[0]; }
-        else if (range === 'month') { d.setMonth(d.getMonth() - 1); startDate = d.toISOString().split('T')[0]; }
+        if (range === 'current_month') { d.setDate(1); startDate = fmtLocal(d); }
+        else if (range === 'month') { d.setMonth(d.getMonth() - 1); startDate = fmtLocal(d); }
         else if (range === '3months') d.setMonth(d.getMonth() - 3);
         else if (range === '6months') d.setMonth(d.getMonth() - 6);
         else if (range === 'year') d.setFullYear(d.getFullYear() - 1);
-        startDate = d.toISOString().split('T')[0];
+        startDate = fmtLocal(d);
     }
 
     async function loadData() {
@@ -648,7 +651,7 @@
         const end = new Date();
         const start = new Date();
         start.setDate(start.getDate() - days + 1);
-        loadDashData(start.toISOString().slice(0, 10), end.toISOString().slice(0, 10));
+        loadDashData(fmtLocal(start), fmtLocal(end));
         document.getElementById('dashDateLabel').textContent = `近${days}天`;
     }
     

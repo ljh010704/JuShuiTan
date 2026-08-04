@@ -21,19 +21,19 @@
 <!-- 统计卡片 -->
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-label">今日订单</div>
+        <div class="stat-label">{{ range_label }}订单</div>
         <div class="stat-value">{{ order_stats.total_orders or 0 }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">今日金额</div>
+        <div class="stat-label">{{ range_label }}金额</div>
         <div class="stat-value">¥{{ "%.0f"|format(order_stats.total_amount or 0) }}</div>
     </div>
     <div class="stat-card success">
-        <div class="stat-label">今日利润</div>
+        <div class="stat-label">{{ range_label }}利润</div>
         <div class="stat-value">¥{{ "%.0f"|format(order_stats.total_profit or 0) }}</div>
     </div>
     <div class="stat-card warning">
-        <div class="stat-label">采购成本</div>
+        <div class="stat-label">{{ range_label }}采购成本</div>
         <div class="stat-value">¥{{ "%.0f"|format(order_stats.total_cost or 0) }}</div>
     </div>
     <div class="stat-card">
@@ -49,11 +49,11 @@
 <!-- 图表区域 -->
 <div class="charts-row">
     <div class="chart-box">
-        <h3>📈 近30天订单趋势</h3>
+        <h3>📈 {{ trend_label }}订单趋势</h3>
         <canvas id="orderTrendChart"></canvas>
     </div>
     <div class="chart-box">
-        <h3>💰 近30天利润趋势</h3>
+        <h3>💰 {{ trend_label }}利润趋势</h3>
         <canvas id="profitTrendChart"></canvas>
     </div>
     <div class="chart-box">
@@ -296,13 +296,14 @@ document.getElementById('datePicker').addEventListener('change', function() {
 });
 
 // 加载指定天数的数据
+function fmtLocal(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 function loadDateRange(days) {
     const end = new Date();
     const start = new Date();
     start.setDate(start.getDate() - days + 1);
-    const startStr = start.toISOString().slice(0, 10);
-    const endStr = end.toISOString().slice(0, 10);
-    window.location.href = `/?date_range=${startStr}_${endStr}&days=${days}`;
+    window.location.href = `/?date_range=${fmtLocal(start)}_${fmtLocal(end)}&days=${days}`;
 }
 </script>
 {% endblock %}

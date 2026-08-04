@@ -24,6 +24,33 @@ STATUS_NAME_MAP = {
 }
 
 
+def _range_label(date, date_range):
+    """根据当前选中范围生成卡片标题前缀（今日/近7天/近30天/日期）"""
+    today = datetime.now().strftime('%Y-%m-%d')
+
+    def fmt(s):
+        try:
+            d = datetime.strptime(s, '%Y-%m-%d')
+            return f'{d.month}月{d.day}日'
+        except ValueError:
+            return s
+
+    if date_range and len(date_range.split('_')) == 2:
+        start, end = date_range.split('_')
+        if start == end:
+            return '今日' if end == today else fmt(end)
+        try:
+            d1 = datetime.strptime(start, '%Y-%m-%d')
+            d2 = datetime.strptime(end, '%Y-%m-%d')
+            diff = (d2 - d1).days + 1
+        except ValueError:
+            return f'{start} - {end}'
+        if diff in (7, 30):
+            return f'近{diff}天'
+        return f'{d1.month}月{d1.day}日 - {d2.month}月{d2.day}日'
+    return '今日' if date == today else fmt(date)
+
+
 def _scope_clause(date, date_range):
     """返回 (where_sql, params)，限定 created_at 范围"""
     if date_range:
@@ -55,6 +82,12 @@ def dashboard():
         days_n = int(days) if days else 30
     except (ValueError, TypeError):
         days_n = 30
+    if days_n < 1:
+        days_n = 1
+
+    trend_label = '今日' if days_n == 1 else f'近{days_n}天'
+    # 今日：按小时分组；其他范围：按天分组
+    date_expr = "substr(created_at, 12, 2) || ':00'" if days_n == 1 else "substr(created_at, 1, 10)"
 
     conn = get_connection()
     try:
@@ -65,7 +98,7 @@ def dashboard():
         """, params).fetchall()]
 
         recent_stats = [dict(r) for r in conn.execute(f"""
-            SELECT substr(created_at, 1, 10) as date,
+            SELECT {date_expr} as date,
                 COUNT(*) as total_orders,
                 COALESCE(SUM(pay_amount), 0) as total_amount,
                 COALESCE(SUM(purchase_cost), 0) as total_cost,
@@ -75,7 +108,7 @@ def dashboard():
               AND status IN ('Sent', 'WaitOuterSent')
               AND created_at >= date('now', 'localtime', ?)
             GROUP BY date ORDER BY date
-        """, (f"-{days_n} days",)).fetchall()]
+        """, (f"-{days_n - 1} days",)).fetchall()]
 
         status_rows = conn.execute(f"""
             SELECT status, COUNT(*) as cnt FROM orders
@@ -99,6 +132,8 @@ def dashboard():
 
     return render_template('index.html',
         today=date,
+        range_label=_range_label(date, date_range),
+        trend_label=trend_label,
         order_stats=order_stats,
         after_sale_stats=after_sale_stats,
         recent_stats=recent_stats,
