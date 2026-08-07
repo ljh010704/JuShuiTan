@@ -544,3 +544,94 @@ textarea:focus {
     border-color: var(--accent-cyan);
     box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
 }
+
+/* ================= 移动端适配 ================= */
+@media (max-width: 768px) {
+    /* 导航栏：品牌一行，菜单横向滑动 */
+    .navbar {
+        height: auto;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 4px;
+    }
+    .nav-brand {
+        font-size: 15px;
+        margin-right: 0;
+        width: 100%;
+        letter-spacing: 1px;
+    }
+    .nav-links {
+        width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+    }
+    .nav-link {
+        white-space: nowrap;
+        padding: 6px 12px;
+        font-size: 12px;
+        flex-shrink: 0;
+    }
+
+    /* 容器与页面头 */
+    .container { padding: 12px; }
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .page-header h1 { font-size: 19px; }
+    .header-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    /* 统计卡片：两列 */
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-bottom: 16px;
+    }
+    .stat-card { padding: 14px 10px; }
+    .stat-value { font-size: 22px; }
+
+    /* 图表：单列堆叠 */
+    .charts-row { grid-template-columns: 1fr; }
+
+    /* 卡片区块收紧 */
+    .section { padding: 14px; }
+    .section-header { flex-wrap: wrap; gap: 8px; }
+
+    /* 所有表格：内容过宽时横向滑动 */
+    .data-table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .data-table td { white-space: nowrap; }
+    /* 已包裹在 .table-responsive 里的表格由外层容器滚动 */
+    .table-responsive .data-table {
+        display: table;
+        overflow-x: visible;
+    }
+
+    /* 筛选栏与分页换行 */
+    .filter-bar {
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-start;
+    }
+    .pagination { flex-wrap: wrap; gap: 8px; }
+
+    /* 弹窗宽度适配 */
+    .modal-content {
+        width: calc(100vw - 24px);
+        max-width: 500px;
+    }
+
+    /* 按钮保持可点尺寸 */
+    .btn { padding: 8px 14px; }
+}
