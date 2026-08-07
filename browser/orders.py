@@ -139,6 +139,15 @@ class OrderScraper:
         goods_list = raw.get('disInnerOrderGoodsViewList') or []
         item_count = len(goods_list) if isinstance(goods_list, list) else 0
 
+        # 供应商：订单级优先，商品级兜底
+        supplier_name = str(raw.get('supplierName') or '')
+        supplier_co_id = str(raw.get('supplierCoId') or '')
+        if not supplier_name and isinstance(goods_list, list) and goods_list:
+            first_goods = goods_list[0] or {}
+            supplier_name = str(first_goods.get('supplierName') or '')
+            if not supplier_co_id or supplier_co_id == '0':
+                supplier_co_id = str(first_goods.get('supplierId') or supplier_co_id)
+
         return {
             'account_name': self.account_name,
             'order_id': str(raw.get('oid') or raw.get('orderId') or raw.get('id') or ''),
@@ -157,6 +166,8 @@ class OrderScraper:
             'created_at': str(created),
             'paid_at': str(raw.get('payTime') or ''),
             'shipped_at': str(raw.get('sendTime') or ''),
+            'supplier_co_id': supplier_co_id,
+            'supplier_name': supplier_name,
             'raw_data': json.dumps(raw, ensure_ascii=False),
             'source': 'api',
         }

@@ -2,6 +2,7 @@
 供应商分析路由
 """
 import asyncio
+import json
 import logging
 from flask import Blueprint, render_template, jsonify, request
 from models.database import get_connection
@@ -17,46 +18,95 @@ def suppliers_page():
 
 @supplier_bp.route('/api/suppliers')
 def api_suppliers():
+    """供应商出单统计 + 热销商品（分销订单口径）"""
     conn = get_connection()
     try:
-        rows = conn.execute("""
+        dist_filter = """order_type LIKE '%分销Plus%'
+              AND order_type NOT LIKE '%供销%'
+              AND order_type NOT LIKE '%自发%'
+              AND status IN ('Sent', 'WaitOuterSent')"""
+
+        rows = conn.execute(f"""
             SELECT
-                json_extract(raw_data, '$.supplierName') as supplier_name,
-                json_extract(raw_data, '$.supplierCoId') as supplier_co_id,
+                supplier_name,
+                MAX(supplier_co_id) as co_id,
                 COUNT(*) as order_count,
-                SUM(pay_amount) as total_amount,
-                SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN (pay_amount - purchase_cost) ELSE 0 END) as total_profit,
-                SUM(CASE WHEN order_type LIKE '%分销Plus%' THEN purchase_cost ELSE 0 END) as total_cost,
+                COALESCE(SUM(pay_amount), 0) as total_amount,
+                COALESCE(SUM(purchase_cost), 0) as total_cost,
+                COALESCE(SUM(pay_amount - purchase_cost), 0) as total_profit,
                 MIN(created_at) as first_order,
                 MAX(created_at) as last_order
             FROM orders
-            WHERE json_extract(raw_data, '$.supplierName') IS NOT NULL
-              AND status IN ('Sent', 'WaitOuterSent')
-              AND order_type LIKE '%分销Plus%'
-              AND order_type NOT LIKE '%供销%'
-              AND order_type NOT LIKE '%自发%'
-            GROUP BY supplier_co_id
+            WHERE supplier_name != '' AND {dist_filter}
+            GROUP BY supplier_name
             ORDER BY order_count DESC
         """).fetchall()
 
+        # 每个供应商的售后数（按 order_id 关联）
+        after_rows = conn.execute("""
+            SELECT o.supplier_name, COUNT(*) as cnt
+            FROM after_sales a
+            JOIN orders o ON a.order_id = o.order_id
+            WHERE o.supplier_name != ''
+            GROUP BY o.supplier_name
+        """).fetchall()
+        after_map = {r['supplier_name']: r['cnt'] for r in after_rows}
+
+        # 每个供应商的热销商品（解析 raw_data 里的商品列表）
+        goods_rows = conn.execute(f"""
+            SELECT supplier_name, raw_data FROM orders
+            WHERE supplier_name != '' AND {dist_filter}
+              AND raw_data IS NOT NULL AND raw_data != ''
+        """).fetchall()
+
+        goods_map = {}
+        for r in goods_rows:
+            sname = r['supplier_name']
+            try:
+                raw = json.loads(r['raw_data'])
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for g in (raw.get('disInnerOrderGoodsViewList') or []):
+                if not isinstance(g, dict):
+                    continue
+                gname = str(g.get('itemName') or '').strip()
+                if not gname:
+                    continue
+                entry = goods_map.setdefault(sname, {}).setdefault(
+                    gname, {'count': 0, 'qty': 0, 'amount': 0.0, 'profit': 0.0})
+                qty = int(g.get('itemCount') or 0)
+                total = float(g.get('totalPrice') or 0)
+                entry['count'] += 1
+                entry['qty'] += qty
+                entry['amount'] += total
+                entry['profit'] += total - float(g.get('drpPrice') or 0) * qty
+
         suppliers = []
         for r in rows:
-            name = r[0] if r[0] else '未知'
-            amount = r[3] or 0
-            profit = r[4] or 0
-            rate = (profit / amount * 100) if amount > 0 else 0
-
+            name = r['supplier_name']
+            amount = r['total_amount'] or 0
+            profit = r['total_profit'] or 0
+            after_cnt = after_map.get(name, 0)
+            goods = sorted(goods_map.get(name, {}).items(),
+                           key=lambda kv: kv[1]['count'], reverse=True)[:5]
             suppliers.append({
                 'name': name,
-                'co_id': r[1],
-                'order_count': r[2],
+                'co_id': r['co_id'] or '',
+                'order_count': r['order_count'],
                 'total_amount': round(amount, 2),
+                'total_cost': round(r['total_cost'] or 0, 2),
                 'total_profit': round(profit, 2),
-                'total_cost': round(r[5] or 0, 2),
-                'profit_rate': round(rate, 1),
-                'first_order': r[6][:10] if r[6] else '-',
-                'last_order': r[7][:10] if r[7] else '-',
-                'has_goods': r[2] > 0,
+                'profit_rate': round(profit / amount * 100, 1) if amount > 0 else 0,
+                'after_count': after_cnt,
+                'after_rate': round(after_cnt / r['order_count'] * 100, 1) if r['order_count'] > 0 else 0,
+                'first_order': (r['first_order'] or '')[:10] or '-',
+                'last_order': (r['last_order'] or '')[:10] or '-',
+                'has_goods': True,
+                'top_goods': [
+                    {'name': gname, 'count': g['count'], 'qty': g['qty'],
+                     'amount': round(g['amount'], 2), 'profit': round(g['profit'], 2)}
+                    for gname, g in goods
+                ],
             })
 
         return jsonify({'data': suppliers, 'total': len(suppliers)})

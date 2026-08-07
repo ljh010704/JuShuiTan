@@ -109,6 +109,21 @@ def init_db():
     if 'note' not in after_cols:
         cursor.execute("ALTER TABLE after_sales ADD COLUMN note TEXT DEFAULT ''")
 
+    # 订单供应商字段迁移 + 从 raw_data 回填历史数据
+    order_cols = [r[1] for r in cursor.execute("PRAGMA table_info(orders)").fetchall()]
+    if 'supplier_co_id' not in order_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN supplier_co_id TEXT DEFAULT ''")
+    if 'supplier_name' not in order_cols:
+        cursor.execute("ALTER TABLE orders ADD COLUMN supplier_name TEXT DEFAULT ''")
+    cursor.execute("""
+        UPDATE orders SET
+            supplier_co_id = COALESCE(json_extract(raw_data, '$.supplierCoId'), ''),
+            supplier_name = COALESCE(json_extract(raw_data, '$.supplierName'), '')
+        WHERE (supplier_name IS NULL OR supplier_name = '')
+          AND raw_data IS NOT NULL AND raw_data != ''
+          AND json_extract(raw_data, '$.supplierName') IS NOT NULL
+    """)
+
     conn.commit()
     conn.close()
 
@@ -124,8 +139,8 @@ class OrderModel:
             conn.execute("""
                 INSERT INTO orders (account_name, order_id, external_id, shop_id, shop_name, order_type, status,
                     status_desc, item_count, pay_amount, freight, discount_amount,
-                    purchase_cost, profit, created_at, paid_at, shipped_at, synced_at, raw_data)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    purchase_cost, profit, created_at, paid_at, shipped_at, supplier_co_id, supplier_name, synced_at, raw_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(order_id) DO UPDATE SET
                     account_name=excluded.account_name,
                     external_id=excluded.external_id,
@@ -143,6 +158,8 @@ class OrderModel:
                     created_at=excluded.created_at,
                     paid_at=excluded.paid_at,
                     shipped_at=excluded.shipped_at,
+                    supplier_co_id=excluded.supplier_co_id,
+                    supplier_name=excluded.supplier_name,
                     synced_at=excluded.synced_at,
                     raw_data=excluded.raw_data
             """, (
@@ -163,6 +180,8 @@ class OrderModel:
                 order.get('created_at', ''),
                 order.get('paid_at', ''),
                 order.get('shipped_at', ''),
+                order.get('supplier_co_id', ''),
+                order.get('supplier_name', ''),
                 datetime.now().isoformat(),
                 order.get('raw_data', ''),
             ))
