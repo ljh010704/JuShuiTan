@@ -286,5 +286,14 @@ function startSupplierPoll() {
             }
         } catch(e) {}
     }, 5000);
-}</script>
+}
+
+// 刷新数据按钮
+function refreshData() {
+    loadData();
+}
+
+// 页面加载时自动拉取
+loadData();
+</script>
 {% endblock %}
