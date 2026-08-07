@@ -1,42 +1,49 @@
 {% extends "base.html" %}
-{% block title %}售后管理 - 聚水潭数据统计中心{% endblock %}
+{% block title %}售后工作台 - 聚水潭数据统计中心{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1>售后管理</h1>
+    <h1>🛠️ 售后工作台</h1>
     <div class="header-actions">
         <input type="date" id="datePicker" value="{{ current_date }}" class="date-input" onchange="loadAfterSales()">
         <button onclick="syncData('after_sales')" class="btn btn-primary">同步售后</button>
     </div>
 </div>
 
-<!-- 每日售后汇总 -->
-<div class="stats-grid" id="afterSalesStats">
-    <div class="stat-card">
-        <div class="stat-label">今日售后数</div>
-        <div class="stat-value" id="todayCount">-</div>
+<!-- 工作台卡片（点击可筛选） -->
+<div class="stats-grid">
+    <div class="stat-card danger wb-card" data-wb="to_push" onclick="filterWorkbench('to_push')">
+        <div class="stat-label">🟡 待推送供应商</div>
+        <div class="stat-value" id="wbToPush">-</div>
     </div>
-    <div class="stat-card danger">
-        <div class="stat-label">待处理</div>
-        <div class="stat-value" id="pendingCount">-</div>
+    <div class="stat-card warning wb-card" data-wb="following" onclick="filterWorkbench('following')">
+        <div class="stat-label">🔵 跟进中（等供应商）</div>
+        <div class="stat-value" id="wbFollowing">-</div>
+        <div class="stat-sub" id="wbOverdue" style="font-size:11px;color:#ff6b6b;display:none;">有超时未回款，记得催！</div>
+    </div>
+    <div class="stat-card wb-card" data-wb="auto" onclick="filterWorkbench('auto')">
+        <div class="stat-label">🟢 无需处理（未发货退款）</div>
+        <div class="stat-value" id="wbAuto">-</div>
+    </div>
+    <div class="stat-card success wb-card" data-wb="done" onclick="filterWorkbench('done')">
+        <div class="stat-label">✅ 已完成</div>
+        <div class="stat-value" id="wbDone">-</div>
     </div>
     <div class="stat-card">
         <div class="stat-label">今日退款总额</div>
         <div class="stat-value" id="todayRefund">-</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-label">累计售后</div>
-        <div class="stat-value" id="totalCount">-</div>
     </div>
 </div>
 
 <!-- 快捷筛选 -->
 <div class="filter-bar">
     <button class="filter-btn active" data-filter="all">全部</button>
-    <button class="filter-btn" data-filter="pending">待处理</button>
-    <button class="filter-btn" data-filter="processed">已处理</button>
+    <button class="filter-btn" data-filter="to_push">待推送</button>
+    <button class="filter-btn" data-filter="following">跟进中</button>
+    <button class="filter-btn" data-filter="done">已完成</button>
+    <button class="filter-btn" data-filter="auto">无需处理</button>
     <span class="filter-separator">|</span>
-    <select id="statusFilter" onchange="filterByStatus(this.value)">
+    <select id="statusFilter" onchange="filterRows()">
         <option value="">全部状态</option>
         <option value="WaitCheck">待审核</option>
         <option value="WaitOuterSent">待退货</option>
@@ -57,22 +64,21 @@
             <th>关联订单</th>
             <th>类型</th>
             <th>退款金额</th>
-            <th>数量</th>
             <th>原因</th>
-            <th>状态</th>
+            <th>客户侧状态</th>
+            <th>供应商跟进</th>
             <th>申请时间</th>
             <th>操作</th>
         </tr>
     </thead>
     <tbody>
         {% for item in items %}
-        <tr data-status="{{ item.status or '' }}" data-processed="{{ 'false' if (item.type in ['退货退款', '已发货退款'] and item.status in ['WaitCheck', 'WaitOuterSent']) else 'true' }}">
+        <tr data-wb="{{ item.wb }}" data-status="{{ item.status or '' }}">
             <td>{{ item.after_sale_id }}</td>
             <td>{{ item.shop_name or '-' }}</td>
             <td>{{ item.external_id or item.order_id or '-' }}</td>
             <td>{{ item.type or '-' }}</td>
             <td>¥{{ "%.2f"|format(item.amount or 0) }}</td>
-            <td>{{ item.quantity or 0 }}</td>
             <td>{{ item.reason or '-' }}</td>
             <td>
                 {% if item.status == 'WaitCheck' %}<span class="badge badge-warning">待审核</span>
@@ -84,15 +90,39 @@
                 {% else %}<span class="badge">{{ item.status or '-' }}</span>
                 {% endif %}
             </td>
+            <td>
+                {% if item.wb == 'auto' %}<span class="badge badge-info">无需处理</span>
+                {% elif item.wb == 'done' %}<span class="badge badge-success">货款已回</span>
+                {% elif item.wb == 'following' %}
+                    <span class="badge badge-warning">已推送{% if item.days > 0 %} · 等{{ item.days }}天{% endif %}</span>
+                    {% if item.days >= 3 %}<span class="badge badge-danger">催一下</span>{% endif %}
+                {% else %}<span class="badge badge-danger">待推送{% if item.days > 0 %} · {{ item.days }}天{% endif %}</span>
+                {% endif %}
+            </td>
             <td>{{ item.created_at[:16] if item.created_at else '-' }}</td>
             <td>
-                {% if item.status in ['WaitCheck', 'WaitOuterSent'] and item.type != '未发货退款' %}
+                {% if item.wb == 'to_push' %}
+                <button class="btn btn-sm btn-outline" onclick="copySupplierMsg(this)"
+                    data-asid="{{ item.after_sale_id }}" data-order="{{ item.external_id or item.order_id }}"
+                    data-shop="{{ item.shop_name or '' }}" data-type="{{ item.type or '' }}"
+                    data-amount="{{ '%.2f'|format(item.amount or 0) }}" data-reason="{{ item.reason or '' }}"
+                    data-created="{{ item.created_at[:16] if item.created_at else '' }}">📋 复制信息</button>
+                <button class="btn btn-sm btn-primary" onclick="markSupplier('{{ item.after_sale_id }}', 'pushed')">📤 标记已推送</button>
+                {% if item.status == 'WaitCheck' %}
                 <button class="btn btn-sm btn-success" onclick="approveAfterSale('{{ item.after_sale_id }}')">同意</button>
                 <button class="btn btn-sm btn-danger" onclick="rejectAfterSale('{{ item.after_sale_id }}')">拒绝</button>
-                {% elif item.type == '未发货退款' and item.status in ['WaitCheck', 'WaitOuterSent'] %}
-                <span style="color:#00bcd4; font-size:12px;">⚡ 自动处理</span>
+                {% endif %}
+                {% elif item.wb == 'following' %}
+                <button class="btn btn-sm btn-outline" onclick="copySupplierMsg(this)"
+                    data-asid="{{ item.after_sale_id }}" data-order="{{ item.external_id or item.order_id }}"
+                    data-shop="{{ item.shop_name or '' }}" data-type="{{ item.type or '' }}"
+                    data-amount="{{ '%.2f'|format(item.amount or 0) }}" data-reason="{{ item.reason or '' }}"
+                    data-created="{{ item.created_at[:16] if item.created_at else '' }}">📋 复制信息</button>
+                <button class="btn btn-sm btn-success" onclick="markSupplier('{{ item.after_sale_id }}', 'refunded')">💰 货款已回</button>
+                {% elif item.wb == 'auto' %}
+                <span style="color:#00bcd4; font-size:12px;">⚡ 自动退款</span>
                 {% else %}
-                <span style="color:#999; font-size:12px;">已处理</span>
+                <span style="color:#999; font-size:12px;">-</span>
                 {% endif %}
             </td>
         </tr>
@@ -102,6 +132,7 @@
         {% endif %}
     </tbody>
 </table>
+</div>
 
 <div id="rejectModal" class="modal" style="display:none">
     <div class="modal-content">
@@ -125,7 +156,11 @@
 var currentRejectId = '';
 var currentFilter = 'all';
 
-function filterByStatus(status) {
+function filterWorkbench(wb) {
+    document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    var btn = document.querySelector('.filter-btn[data-filter="' + wb + '"]');
+    if (btn) btn.classList.add('active');
+    currentFilter = wb;
     filterRows();
 }
 
@@ -134,9 +169,7 @@ function filterRows() {
     var rows = document.querySelectorAll('#afterSalesTable tbody tr');
     rows.forEach(function(row) {
         var matchStatus = !statusVal || row.dataset.status === statusVal;
-        var matchFilter = true;
-        if (currentFilter === 'pending') matchFilter = row.dataset.processed === 'false';
-        else if (currentFilter === 'processed') matchFilter = row.dataset.processed === 'true';
+        var matchFilter = currentFilter === 'all' || row.dataset.wb === currentFilter;
         row.style.display = (matchStatus && matchFilter) ? '' : 'none';
     });
 }
@@ -149,6 +182,42 @@ document.querySelectorAll('.filter-btn').forEach(function(btn) {
         filterRows();
     });
 });
+
+// 复制发给供应商的协调信息
+async function copySupplierMsg(btn) {
+    var d = btn.dataset;
+    var msg = '【售后协调】供应商你好，我店有一笔售后需要处理：\n'
+        + '售后单号：' + d.asid + '\n'
+        + '关联订单：' + d.order + '\n'
+        + '店铺：' + d.shop + '\n'
+        + '售后类型：' + d.type + '\n'
+        + '退款金额：¥' + d.amount + '\n'
+        + '申请原因：' + (d.reason || '无') + '\n'
+        + '申请时间：' + d.created + '\n'
+        + '麻烦尽快处理，谢谢！';
+    try {
+        await navigator.clipboard.writeText(msg);
+        btn.textContent = '✅ 已复制';
+    } catch(e) {
+        var ta = document.createElement('textarea');
+        ta.value = msg;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = '✅ 已复制';
+    }
+    setTimeout(function() { btn.textContent = '📋 复制信息'; }, 1500);
+}
+
+// 标记供应商跟进状态
+async function markSupplier(id, status) {
+    var tip = status === 'pushed' ? '确认已把该售后推送给供应商？' : '确认该售后货款已回到你账户？';
+    if (!confirm(tip)) return;
+    var res = await apiCall('/api/after-sales/supplier-status', 'POST', { after_sale_id: id, status: status });
+    alert(res.message);
+    if (res.success) location.reload();
+}
 
 async function approveAfterSale(id) {
     if (!confirm('确认同意该售后申请？')) return;
@@ -177,8 +246,6 @@ function closeModal(id) {
 
 async function loadAfterSales() {
     var date = document.getElementById('datePicker').value;
-    var url = '/api/after-sales';
-    if (date) url += '?date=' + date;
     location.href = '/after-sales?date=' + date;
 }
 
@@ -204,7 +271,6 @@ function startAfterSalesPoll() {
             var data = await res.json();
             if (!data.running) {
                 clearInterval(poll);
-                loadStats();
                 location.reload();
             }
         } catch(e) {}
@@ -216,10 +282,16 @@ async function loadStats() {
         var date = document.getElementById('datePicker').value || new Date().toISOString().split('T')[0];
         var res = await fetch('/api/after-sales/stats?date=' + date);
         var data = await res.json();
-        document.getElementById('todayCount').textContent = data.today_count || 0;
-        document.getElementById('pendingCount').textContent = data.pending_count || 0;
+        document.getElementById('wbToPush').textContent = (data.wb && data.wb.to_push) || 0;
+        document.getElementById('wbFollowing').textContent = (data.wb && data.wb.following) || 0;
+        document.getElementById('wbAuto').textContent = (data.wb && data.wb.auto) || 0;
+        document.getElementById('wbDone').textContent = (data.wb && data.wb.done) || 0;
         document.getElementById('todayRefund').textContent = '¥' + (data.today_refund || 0).toFixed(2);
-        document.getElementById('totalCount').textContent = data.total_count || 0;
+        if (data.overdue > 0) {
+            var el = document.getElementById('wbOverdue');
+            el.style.display = 'block';
+            el.textContent = '⚠️ ' + data.overdue + ' 笔超3天未回款，记得催供应商！';
+        }
     } catch(e) {}
 }
 

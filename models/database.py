@@ -100,6 +100,15 @@ def init_db():
     );
     """)
 
+    # 售后供应商跟进字段迁移（已有列则跳过）
+    after_cols = [r[1] for r in cursor.execute("PRAGMA table_info(after_sales)").fetchall()]
+    if 'supplier_status' not in after_cols:
+        cursor.execute("ALTER TABLE after_sales ADD COLUMN supplier_status TEXT DEFAULT ''")
+    if 'supplier_pushed_at' not in after_cols:
+        cursor.execute("ALTER TABLE after_sales ADD COLUMN supplier_pushed_at TEXT")
+    if 'note' not in after_cols:
+        cursor.execute("ALTER TABLE after_sales ADD COLUMN note TEXT DEFAULT ''")
+
     conn.commit()
     conn.close()
 
@@ -367,6 +376,31 @@ class AfterSalesModel:
                 FROM after_sales WHERE substr(created_at,1,10) BETWEEN ? AND ?
             """, (start_date, end_date)).fetchone()
             return dict(row) if row else {}
+        finally:
+            conn.close()
+
+    @staticmethod
+    def set_supplier_status(after_sale_id, status):
+        """更新供应商跟进状态: ''(未推送) / pushed(已推送) / refunded(货款已回)"""
+        conn = get_connection()
+        try:
+            if status == 'pushed':
+                conn.execute(
+                    "UPDATE after_sales SET supplier_status=?, supplier_pushed_at=? WHERE after_sale_id=?",
+                    (status, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), after_sale_id)
+                )
+            elif status == '':
+                conn.execute(
+                    "UPDATE after_sales SET supplier_status=?, supplier_pushed_at='' WHERE after_sale_id=?",
+                    (status, after_sale_id)
+                )
+            else:
+                conn.execute(
+                    "UPDATE after_sales SET supplier_status=? WHERE after_sale_id=?",
+                    (status, after_sale_id)
+                )
+            conn.commit()
+            return True
         finally:
             conn.close()
 

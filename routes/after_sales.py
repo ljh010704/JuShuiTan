@@ -12,6 +12,38 @@ after_sales_bp = Blueprint('after_sales', __name__)
 logger = logging.getLogger(__name__)
 
 
+def _workbench_status(item):
+    """售后工作台状态: auto(无需处理) / to_push(待推送供应商) / following(跟进中) / done(已完成)"""
+    if (item.get('type') or '') == '未发货退款':
+        return 'auto'
+    if (item.get('supplier_status') or '') == 'refunded':
+        return 'done'
+    if (item.get('status') or '') in ('Finished', 'Cancelled', 'Rejected'):
+        return 'done'
+    if (item.get('supplier_status') or '') == 'pushed':
+        return 'following'
+    if (item.get('status') or '') == 'Agreed':
+        return 'following'
+    return 'to_push'
+
+
+def _waiting_days(item):
+    """等待天数：已推送按推送时间算，未推送按申请时间算"""
+    base = (item.get('supplier_pushed_at') or item.get('created_at') or '')[:19]
+    try:
+        dt = datetime.strptime(base, '%Y-%m-%d %H:%M:%S')
+        return max((datetime.now() - dt).days, 0)
+    except (ValueError, TypeError):
+        return 0
+
+
+def _annotate(items):
+    for item in items:
+        item['wb'] = _workbench_status(item)
+        item['days'] = _waiting_days(item)
+    return items
+
+
 @after_sales_bp.route('/after-sales')
 def after_sales_page():
     try:
@@ -31,7 +63,7 @@ def after_sales_page():
     total = AfterSalesModel.count()
 
     return render_template('after_sales.html',
-        items=items,
+        items=_annotate(items),
         total=total,
         page=page,
         per_page=per_page,
@@ -73,18 +105,44 @@ def api_after_sale_stats():
             "SELECT COUNT(*) as cnt, COALESCE(SUM(amount), 0) as refund FROM after_sales WHERE created_at LIKE ?",
             (f"{date}%",)
         ).fetchone()
-        pending = conn.execute(
-            "SELECT COUNT(*) as cnt FROM after_sales WHERE status IN ('WaitCheck', 'WaitOuterSent') AND type != '未发货退款'"
-        ).fetchone()
-        total = conn.execute("SELECT COUNT(*) as cnt FROM after_sales").fetchone()
+        rows = conn.execute(
+            "SELECT type, status, supplier_status, supplier_pushed_at, created_at FROM after_sales"
+        ).fetchall()
+        wb_counts = {'to_push': 0, 'following': 0, 'auto': 0, 'done': 0}
+        overdue = 0
+        for r in rows:
+            item = dict(r)
+            wb = _workbench_status(item)
+            wb_counts[wb] += 1
+            if wb == 'following' and _waiting_days(item) >= 3:
+                overdue += 1
         return jsonify({
             'today_count': today['cnt'] if today else 0,
             'today_refund': today['refund'] if today else 0,
-            'pending_count': pending['cnt'] if pending else 0,
-            'total_count': total['cnt'] if total else 0,
+            'wb': wb_counts,
+            'overdue': overdue,
         })
     finally:
         conn.close()
+
+
+@after_sales_bp.route('/api/after-sales/supplier-status', methods=['POST'])
+def api_set_supplier_status():
+    """标记供应商跟进状态：pushed(已推送) / refunded(货款已回) / ''(重置)"""
+    data = request.get_json() or {}
+    after_sale_id = data.get('after_sale_id', '')
+    status = data.get('status', '')
+    if not after_sale_id:
+        return jsonify({'success': False, 'message': '缺少售后单号'})
+    if status not in ('', 'pushed', 'refunded'):
+        return jsonify({'success': False, 'message': '无效状态'})
+    AfterSalesModel.set_supplier_status(after_sale_id, status)
+    msg = {
+        'pushed': '已标记为「已推送供应商」',
+        'refunded': '已标记为「货款已回」',
+        '': '已重置为「待推送」',
+    }[status]
+    return jsonify({'success': True, 'message': msg})
 
 
 @after_sales_bp.route('/api/after-sales/export.xlsx')
