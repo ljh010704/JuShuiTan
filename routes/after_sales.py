@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 def _workbench_status(item):
     """售后工作台状态: auto(无需处理) / to_push(待推送供应商) / following(跟进中) / done(已完成)"""
-    if (item.get('type') or '') == '未发货退款':
-        return 'auto'
+    if (item.get('type') or '') == '仅退款' and (item.get('status') or '') != '已发货':
+        return 'auto'  # 未发货仅退款，自动退款无需处理
     if (item.get('supplier_status') or '') == 'refunded':
         return 'done'
     if (item.get('status') or '') in ('Finished', 'Cancelled', 'Rejected'):

@@ -42,12 +42,14 @@ def api_suppliers():
             ORDER BY order_count DESC
         """).fetchall()
 
-        # 每个供应商的售后数（按 order_id 关联）
+        # 每个供应商的售后数（按 order_id 关联，只算已发货后的退款，未发货退款与供应商无关）
         after_rows = conn.execute("""
             SELECT o.supplier_name, COUNT(*) as cnt
             FROM after_sales a
             JOIN orders o ON a.order_id = o.order_id
             WHERE o.supplier_name != ''
+              AND a.type != '补发'
+              AND a.status = '已发货'
             GROUP BY o.supplier_name
         """).fetchall()
         after_map = {r['supplier_name']: r['cnt'] for r in after_rows}
